@@ -1,0 +1,31 @@
+INFO:     127.0.0.1:63356 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49672 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58899 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64606 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57495 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64637 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61782 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50192 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50223 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58331 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61739 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62432 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60926 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52098 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64440 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58789 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51977 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53127 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63323 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55048 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49981 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64788 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61340 - "POST /api/chat HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:61353 - "POST /api/chat HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:52046 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54780 - "POST /api/chat HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:50515 - "POST /api/chat HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:62300 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61650 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56132 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49372 - "POST /api/chat HTTP/1.1" 200 OK

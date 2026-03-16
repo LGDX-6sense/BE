@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-from pipeline import PROJECT_ROOT, detect_device, predict_noise
+from pipeline import PROJECT_ROOT, detect_device, first_existing_path, predict_noise
 
 try:
     from openai import OpenAI
@@ -19,10 +19,16 @@ except ImportError:
     OpenAI = None
 
 
-DEFAULT_AGENT_MODEL = os.getenv("OPENAI_AGENT_MODEL", os.getenv("OPENAI_MODEL", "gpt-5-mini"))
+DEFAULT_AGENT_MODEL = os.getenv("OPENAI_AGENT_MODEL", os.getenv("OPENAI_MODEL", "gpt-4-mini"))
 DEFAULT_VISION_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4.1-mini")
-DEFAULT_CHUNK_PATH = PROJECT_ROOT / "data" / "lg_solution_chunks.jsonl"
-DEFAULT_FULL_DOC_PATH = PROJECT_ROOT / "data" / "lg_solution_all.json"
+DEFAULT_CHUNK_PATH = first_existing_path(
+    PROJECT_ROOT / "data" / "lg_solution_chunks.jsonl",
+    PROJECT_ROOT / "lg_solution_chunks.jsonl",
+)
+DEFAULT_FULL_DOC_PATH = first_existing_path(
+    PROJECT_ROOT / "data" / "lg_solution_all.json",
+    PROJECT_ROOT / "lg_solution_all.json",
+)
 DEFAULT_TOP_K = 5
 
 MODEL_ALIASES = {
@@ -95,6 +101,7 @@ class AgentEvidenceBundle:
     device_hint: str
     audio: Optional[AudioEvidence] = None
     image: Optional[ImageEvidence] = None
+    warnings: List[str] = field(default_factory=list)
     retrieved_contexts: List[RetrievedContext] = field(default_factory=list)
 
 
@@ -169,9 +176,18 @@ def load_chunk_records(chunk_path: str = str(DEFAULT_CHUNK_PATH)) -> List[Dict[s
     """Load pre-chunked LG support records for local retrieval."""
     path = Path(chunk_path)
     if not path.exists():
-        raise FileNotFoundError(
-            f"Chunk file not found: {path}. Run `python src/build_rag_chunks.py` first."
-        )
+        full_doc_path = Path(DEFAULT_FULL_DOC_PATH)
+        if not full_doc_path.exists():
+            raise FileNotFoundError(
+                f"Chunk file not found: {path}. Full document fallback also missing: {full_doc_path}"
+            )
+
+        from build_rag_chunks import build_chunks
+
+        documents = json.loads(full_doc_path.read_text(encoding="utf-8"))
+        if not isinstance(documents, list):
+            raise ValueError(f"Expected a JSON array in {full_doc_path}")
+        return build_chunks(documents)
 
     records: List[Dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as file:
@@ -499,8 +515,40 @@ def build_evidence_payload(bundle: AgentEvidenceBundle) -> Dict[str, Any]:
         "device_hint": bundle.device_hint,
         "audio": asdict(bundle.audio) if bundle.audio else None,
         "image": asdict(bundle.image) if bundle.image else None,
+        "warnings": bundle.warnings,
         "retrieved_contexts": [asdict(context) for context in bundle.retrieved_contexts],
     }
+
+
+def summarize_empty_response(response: Any) -> str:
+    """Capture the most useful metadata when the Responses API returns no text."""
+    response_status = getattr(response, "status", "unknown")
+    response_error = getattr(response, "error", None)
+    incomplete_details = getattr(response, "incomplete_details", None)
+    incomplete_reason = getattr(incomplete_details, "reason", None) if incomplete_details else None
+    return f"status={response_status}, incomplete_reason={incomplete_reason}, error={response_error}"
+
+
+def build_agent_request_kwargs(
+    model_name: str,
+    instructions: str,
+    user_prompt: str,
+    *,
+    max_output_tokens: int,
+) -> Dict[str, Any]:
+    """Assemble model-specific Responses API arguments."""
+    request_kwargs: Dict[str, Any] = {
+        "model": model_name,
+        "max_output_tokens": max_output_tokens,
+        "instructions": instructions,
+        "input": user_prompt,
+    }
+    if model_name.startswith("gpt-5"):
+        request_kwargs["reasoning"] = {"effort": "minimal"}
+        request_kwargs["text"] = {"verbosity": "low"}
+    else:
+        request_kwargs["temperature"] = 0.2
+    return request_kwargs
 
 
 def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
@@ -514,6 +562,7 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         "Combine the user's text, local audio classifier output, image analysis, and LG support context. "
         "Do not overstate certainty. If evidence is weak or conflicting, say so. "
         "Write the final answer in Korean. "
+        "If warnings indicate a missing modality result, briefly acknowledge that limitation. "
         "Use these exact section headings: Summary, Evidence, Likely causes, Self-check steps, Service recommendation, Follow-up question."
     )
 
@@ -526,24 +575,34 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         "If an extra image, audio clip, or symptom detail would improve confidence, ask for the single best next input."
     )
 
-    model_name = resolve_openai_model(DEFAULT_AGENT_MODEL, "gpt-5-mini")
-    request_kwargs = {
-        "model": model_name,
-        "max_output_tokens": 900,
-        "instructions": instructions,
-        "input": user_prompt,
-    }
-    if supports_temperature(model_name):
-        request_kwargs["temperature"] = 0.2
+    primary_model = resolve_openai_model(DEFAULT_AGENT_MODEL, "gpt-5-mini")
+    attempt_configs = [
+        (primary_model, 1200),
+        (primary_model, 1800),
+    ]
+    if primary_model != "gpt-4.1-mini":
+        attempt_configs.append(("gpt-4.1-mini", 900))
 
-    response = client.responses.create(**request_kwargs)
+    failures: List[str] = []
+    for attempt_index, (model_name, max_output_tokens) in enumerate(attempt_configs, start=1):
+        response = client.responses.create(
+            **build_agent_request_kwargs(
+                model_name,
+                instructions,
+                user_prompt,
+                max_output_tokens=max_output_tokens,
+            )
+        )
 
-    output_text = extract_response_text(response)
-    if not output_text:
-        response_status = getattr(response, "status", "unknown")
-        response_error = getattr(response, "error", None)
-        raise RuntimeError(f"The OpenAI agent response was empty. status={response_status}, error={response_error}")
-    return output_text
+        output_text = extract_response_text(response)
+        if output_text:
+            return output_text
+
+        failures.append(f"attempt={attempt_index}, model={model_name}, {summarize_empty_response(response)}")
+
+    raise RuntimeError(
+        "The OpenAI agent response was empty after retries. " + " | ".join(failures)
+    )
 
 
 def run_agent(
@@ -554,8 +613,22 @@ def run_agent(
     vector_store_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the full multimodal agent pipeline and return structured output."""
-    audio_evidence = build_audio_evidence(audio_path) if audio_path else None
-    image_evidence = analyze_image(image_path, user_text=user_text) if image_path else None
+    warnings: List[str] = []
+    audio_evidence = None
+    image_evidence = None
+
+    if audio_path:
+        try:
+            audio_evidence = build_audio_evidence(audio_path)
+        except Exception as error:
+            warnings.append(f"Audio analysis unavailable: {error}")
+
+    if image_path:
+        try:
+            image_evidence = analyze_image(image_path, user_text=user_text)
+        except Exception as error:
+            warnings.append(f"Image analysis unavailable: {error}")
+
     device_hint = infer_device_hint(user_text, audio_evidence, image_evidence)
 
     bundle = AgentEvidenceBundle(
@@ -563,6 +636,7 @@ def run_agent(
         device_hint=device_hint,
         audio=audio_evidence,
         image=image_evidence,
+        warnings=warnings,
     )
 
     vector_store_id = vector_store_id or os.getenv("OPENAI_VECTOR_STORE_ID")

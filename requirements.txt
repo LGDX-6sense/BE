@@ -4,3 +4,6 @@ librosa
 tensorflow
 openai
 gradio
+fastapi
+uvicorn[standard]
+python-multipart

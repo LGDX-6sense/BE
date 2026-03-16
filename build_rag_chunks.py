@@ -7,8 +7,12 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SOURCE_PATH = PROJECT_ROOT / "data" / "lg_solution_all.json"
+PROJECT_ROOT = Path(__file__).resolve().parent
+DEFAULT_SOURCE_PATH = (
+    (PROJECT_ROOT / "data" / "lg_solution_all.json")
+    if (PROJECT_ROOT / "data" / "lg_solution_all.json").exists()
+    else (PROJECT_ROOT / "lg_solution_all.json")
+)
 DEFAULT_OUTPUT_PATH = PROJECT_ROOT / "data" / "lg_solution_chunks.jsonl"
 
 

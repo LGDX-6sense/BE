@@ -33,21 +33,32 @@ except ImportError:
     OpenAI = None
 
 
+def first_existing_path(*candidates: Path) -> Path:
+    """Return the first existing path, or the primary candidate if none exist yet."""
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return candidates[0]
+
+
 def get_project_root() -> Path:
     """Return the project root in both local and Colab environments."""
     if "__file__" in globals():
-        return Path(__file__).resolve().parent.parent
+        return Path(__file__).resolve().parent
     return Path.cwd()
 
 
 PROJECT_ROOT = get_project_root()
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "smart_care_multi_model_v2.h5"
-DEFAULT_AUDIO_DIR = PROJECT_ROOT / "audio"
-DEFAULT_SOLUTION_PATH = PROJECT_ROOT / "data" / "lg_solution.json"
-DEFAULT_PRODUCT_CLASSES_PATH = PROJECT_ROOT / "classes_product.npy"
-DEFAULT_STATUS_CLASSES_PATH = PROJECT_ROOT / "classes_status.npy"
-DEFAULT_DETAIL_CLASSES_PATH = PROJECT_ROOT / "classes_detail.npy"
-DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+DEFAULT_MODEL_PATH = first_existing_path(PROJECT_ROOT / "smart_care_multi_model_v2.h5")
+DEFAULT_AUDIO_DIR = first_existing_path(PROJECT_ROOT / "audio")
+DEFAULT_SOLUTION_PATH = first_existing_path(
+    PROJECT_ROOT / "data" / "lg_solution.json",
+    PROJECT_ROOT / "lg_solution.json",
+)
+DEFAULT_PRODUCT_CLASSES_PATH = first_existing_path(PROJECT_ROOT / "classes_product.npy")
+DEFAULT_STATUS_CLASSES_PATH = first_existing_path(PROJECT_ROOT / "classes_status.npy")
+DEFAULT_DETAIL_CLASSES_PATH = first_existing_path(PROJECT_ROOT / "classes_detail.npy")
+DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4-mini")
 
 TARGET_SAMPLE_RATE = 22050
 TARGET_MELS = 128

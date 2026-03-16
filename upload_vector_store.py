@@ -4,7 +4,7 @@ import argparse
 import os
 from pathlib import Path
 
-from pipeline import PROJECT_ROOT
+from pipeline import PROJECT_ROOT, first_existing_path
 
 try:
     from openai import OpenAI
@@ -12,7 +12,10 @@ except ImportError:
     OpenAI = None
 
 
-DEFAULT_CHUNK_PATH = PROJECT_ROOT / "data" / "lg_solution_chunks.jsonl"
+DEFAULT_CHUNK_PATH = first_existing_path(
+    PROJECT_ROOT / "data" / "lg_solution_chunks.jsonl",
+    PROJECT_ROOT / "lg_solution_chunks.jsonl",
+)
 
 
 def ensure_openai() -> None:

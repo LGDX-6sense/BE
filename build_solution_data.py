@@ -9,7 +9,7 @@ from typing import Dict, List, Sequence
 from urllib.parse import urlsplit, urlunsplit
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "data"
 
 
