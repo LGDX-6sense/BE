@@ -101,15 +101,18 @@ class _MobileHomePageState extends State<MobileHomePage> {
   File? _selectedImage;
   File? _selectedAudio;
   File? _recordedVoice;
+  File? _recordedNoise;
   String? _selectedImageName;
   String? _selectedAudioName;
   String? _recordedVoiceName;
+  String? _recordedNoiseName;
   String? _latestEvidence;
   String? _errorMessage;
   bool _isSubmitting = false;
   bool _isCheckingConnection = false;
   bool _serverHealthy = false;
   bool _isRecordingVoice = false;
+  bool _isRecordingNoise = false;
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
   final String _dbUserName = 'ㅇㅇ';
@@ -153,7 +156,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_selectedImage != null) {
       return AssistantMode.photo;
     }
-    if (_isRecordingVoice || _selectedAudio != null || _recordedVoice != null) {
+    if (_isRecordingVoice || _isRecordingNoise || _selectedAudio != null || _recordedVoice != null || _recordedNoise != null) {
       return AssistantMode.audio;
     }
     return AssistantMode.idle;
@@ -164,7 +167,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
         (_messageController.text.trim().isNotEmpty ||
             _selectedImage != null ||
             _selectedAudio != null ||
-            _recordedVoice != null);
+            _recordedVoice != null ||
+            _recordedNoise != null);
   }
 
   String get _displayName {
@@ -479,6 +483,171 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
   }
 
+  Future<void> _toggleNoiseRecording() async {
+    if (_isRecordingNoise) {
+      await _stopNoiseRecording();
+      return;
+    }
+    await _startNoiseRecording();
+  }
+
+  Future<void> _startNoiseRecording() async {
+    if (_isSubmitting) return;
+    if (_isRecordingVoice) {
+      if (!mounted) return;
+      setState(() => _errorMessage = '음성 녹음 중에는 소음 녹음을 시작할 수 없습니다.');
+      return;
+    }
+
+    try {
+      await _stopSpeaking();
+      final hasPermission = await _voiceRecorder.hasPermission();
+      if (!hasPermission) {
+        if (!mounted) return;
+        setState(() => _errorMessage = '마이크 권한이 필요합니다.');
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final outputPath =
+          '${tempDir.path}${Platform.pathSeparator}noise_recording_$timestamp.m4a';
+
+      await _voiceRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          sampleRate: 22050,
+          numChannels: 1,
+          autoGain: false,
+          echoCancel: false,
+          noiseSuppress: false,
+        ),
+        path: outputPath,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isRecordingNoise = true;
+        _recordedNoise = null;
+        _recordedNoiseName = null;
+        _errorMessage = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isRecordingNoise = false;
+        _errorMessage = '소음 녹음을 시작하지 못했습니다: $error';
+      });
+    }
+  }
+
+  Future<void> _stopNoiseRecording() async {
+    try {
+      final savedPath = await _voiceRecorder.stop();
+      if (!mounted) return;
+
+      setState(() {
+        _isRecordingNoise = false;
+        if (savedPath == null || savedPath.isEmpty) {
+          _errorMessage = '소음 녹음 파일을 저장하지 못했습니다.';
+          return;
+        }
+        _recordedNoise = File(savedPath);
+        _recordedNoiseName = _basename(savedPath);
+        _errorMessage = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isRecordingNoise = false;
+        _errorMessage = '소음 녹음을 종료하지 못했습니다: $error';
+      });
+    }
+  }
+
+  Future<void> _handleMicTap() async {
+    if (_isRecordingVoice) {
+      await _stopVoiceRecording();
+    } else if (_isRecordingNoise) {
+      await _stopNoiseRecording();
+    } else {
+      await _showMicModeSheet();
+    }
+  }
+
+  Future<void> _showMicModeSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF8),
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '마이크 모드 선택',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '말하기로 텍스트를 입력하거나, 제품 소리를 녹음해 분석받을 수 있어요.',
+                  style: TextStyle(
+                    color: Colors.black.withValues(alpha: 0.58),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _AttachmentActionTile(
+                  icon: Icons.mic_rounded,
+                  title: '말하기 (STT)',
+                  subtitle: '말한 내용을 텍스트로 변환해 전송합니다.',
+                  color: const Color(0xFFFFECE8),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    Future<void>.delayed(
+                      const Duration(milliseconds: 120),
+                      _startVoiceRecording,
+                    );
+                  },
+                ),
+                _AttachmentActionTile(
+                  icon: Icons.graphic_eq_rounded,
+                  title: '소음 녹음',
+                  subtitle: '제품에서 나는 소리를 녹음해 AI가 분석합니다.',
+                  color: const Color(0xFFFFF3E0),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    Future<void>.delayed(
+                      const Duration(milliseconds: 120),
+                      _startNoiseRecording,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _openAttachmentSheet() async {
     if (_isSubmitting) {
       return;
@@ -553,14 +722,27 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       icon: _isRecordingVoice
                           ? Icons.stop_circle_rounded
                           : Icons.mic_rounded,
-                      title: _isRecordingVoice ? '음성 녹음 종료' : '음성 녹음',
+                      title: _isRecordingVoice ? '음성 녹음 종료' : '음성 녹음 (STT)',
                       subtitle: _isRecordingVoice
                           ? '현재 녹음을 저장하고 첨부합니다.'
-                          : '문제 소리나 설명을 바로 녹음합니다.',
+                          : '말한 내용을 텍스트로 변환해 전송합니다.',
                       color: _isRecordingVoice
                           ? const Color(0xFFFFE0DF)
                           : const Color(0xFFFFECE8),
                       onTap: () => handleTap(_toggleVoiceRecording),
+                    ),
+                    _AttachmentActionTile(
+                      icon: _isRecordingNoise
+                          ? Icons.stop_circle_rounded
+                          : Icons.graphic_eq_rounded,
+                      title: _isRecordingNoise ? '소음 녹음 종료' : '소음 녹음',
+                      subtitle: _isRecordingNoise
+                          ? '현재 소음 녹음을 저장하고 첨부합니다.'
+                          : '제품에서 나는 소리를 녹음해 AI가 분석합니다.',
+                      color: _isRecordingNoise
+                          ? const Color(0xFFFFF3E0)
+                          : const Color(0xFFFFF3E0),
+                      onTap: () => handleTap(_toggleNoiseRecording),
                     ),
                     _AttachmentActionTile(
                       icon: Icons.audio_file_rounded,
@@ -589,12 +771,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_isRecordingVoice) {
       await _stopVoiceRecording();
     }
+    if (_isRecordingNoise) {
+      await _stopNoiseRecording();
+    }
 
     final message = _messageController.text.trim();
     if (message.isEmpty &&
         _selectedImage == null &&
         _selectedAudio == null &&
-        _recordedVoice == null) {
+        _recordedVoice == null &&
+        _recordedNoise == null) {
       setState(() {
         _errorMessage = '텍스트, 사진, 음성 중 하나 이상을 추가해주세요.';
       });
@@ -647,6 +833,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
         );
       }
 
+      if (_recordedNoise != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'audio',
+            _recordedNoise!.path,
+            filename: _recordedNoiseName,
+          ),
+        );
+      }
+
       final streamed = await request.send().timeout(
         const Duration(seconds: 90),
       );
@@ -692,9 +888,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _selectedImage = null;
         _selectedAudio = null;
         _recordedVoice = null;
+        _recordedNoise = null;
         _selectedImageName = null;
         _selectedAudioName = null;
         _recordedVoiceName = null;
+        _recordedNoiseName = null;
         _messageController.clear();
         _serverHealthy = true;
         _serverStatus = '연결됨';
@@ -734,6 +932,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_isRecordingVoice) {
       await _stopVoiceRecording();
     }
+    if (_isRecordingNoise) {
+      await _stopNoiseRecording();
+    }
     await _stopSpeaking();
     if (!mounted) {
       return;
@@ -744,9 +945,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _selectedImage = null;
       _selectedAudio = null;
       _recordedVoice = null;
+      _recordedNoise = null;
       _selectedImageName = null;
       _selectedAudioName = null;
       _recordedVoiceName = null;
+      _recordedNoiseName = null;
       _latestEvidence = null;
       _errorMessage = null;
       _messageController.clear();
@@ -761,9 +964,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _selectedImage = null;
       _selectedAudio = null;
       _recordedVoice = null;
+      _recordedNoise = null;
       _selectedImageName = null;
       _selectedAudioName = null;
       _recordedVoiceName = null;
+      _recordedNoiseName = null;
       _latestEvidence = null;
       _errorMessage = null;
       _messageController.clear();
@@ -1329,12 +1534,37 @@ class _MobileHomePageState extends State<MobileHomePage> {
       );
     }
 
+    if (_recordedNoiseName != null) {
+      chips.add(
+        InputChip(
+          avatar: const Icon(Icons.graphic_eq_rounded, size: 18),
+          label: Text(_recordedNoiseName!),
+          onDeleted: () {
+            setState(() {
+              _recordedNoise = null;
+              _recordedNoiseName = null;
+            });
+          },
+        ),
+      );
+    }
+
     if (_isRecordingVoice) {
       chips.add(
         const Chip(
           avatar: Icon(Icons.fiber_manual_record_rounded, color: Colors.red),
           label: Text('녹음 중'),
           backgroundColor: Color(0xFFFFEEEA),
+        ),
+      );
+    }
+
+    if (_isRecordingNoise) {
+      chips.add(
+        const Chip(
+          avatar: Icon(Icons.graphic_eq_rounded, color: Colors.orange),
+          label: Text('소음 녹음 중'),
+          backgroundColor: Color(0xFFFFF3E0),
         ),
       );
     }
@@ -1852,7 +2082,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         onPressed: _isSubmitting
                             ? null
                             : (showMicAction
-                                  ? _toggleVoiceRecording
+                                  ? _handleMicTap
                                   : _sendMessage),
                         icon: _isSubmitting
                             ? const SizedBox.square(
@@ -1864,7 +2094,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                               )
                             : Icon(
                                 showMicAction
-                                    ? (_isRecordingVoice
+                                    ? ((_isRecordingVoice || _isRecordingNoise)
                                           ? Icons.stop_circle_rounded
                                           : Icons.mic_none_rounded)
                                     : Icons.arrow_upward_rounded,
@@ -1872,9 +2102,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                 color: showMicAction
                                     ? (_isRecordingVoice
                                           ? const Color(0xFFCA4156)
-                                          : Colors.black.withValues(
-                                              alpha: 0.36,
-                                            ))
+                                          : _isRecordingNoise
+                                              ? const Color(0xFFE07A00)
+                                              : Colors.black.withValues(
+                                                  alpha: 0.36,
+                                                ))
                                     : Colors.white,
                               ),
                       ),
