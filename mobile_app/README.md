@@ -14,3 +14,23 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Hot Reload on Device
+
+Run the app in resident mode on the connected Android device:
+
+```powershell
+.\run_hot_reload.ps1
+```
+
+Optional parameters:
+
+```powershell
+.\run_hot_reload.ps1 -DeviceId R3CN205RZTY -BaseUrl http://127.0.0.1:8000
+```
+
+While `flutter run` is active:
+
+- Press `r` for Hot Reload
+- Press `R` for Hot Restart
+- Press `q` to quit
