@@ -1,4 +1,4 @@
-// ignore_for_file: unused_element
+/// ignore_for_file: unused_element
 
 import 'dart:async';
 import 'dart:convert';
@@ -780,153 +780,222 @@ class _MobileHomePageState extends State<MobileHomePage> {
             colors: [Color(0xFFFFFBF8), Color(0xFFFFF3EE), Color(0xFFFFECE6)],
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'ChatThinQ',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF221D1C),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '$_displayName님을 위한 맞춤 안내',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black.withValues(alpha: 0.88),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '생성형 AI를 활용한 스마트 어시스턴트로\n더 나은 자가진단과 손쉬운 대처를 경험해보세요.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.55,
-                          color: Colors.black.withValues(alpha: 0.56),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF6C53),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text(
-                          'NEW',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '궁금증을 해결해줄 새로운 해결사',
-                        style: TextStyle(
-                          fontSize: 18,
-                          height: 1.24,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF231D1C),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      InkWell(
-                        onTap: _openChatHome,
-                        borderRadius: BorderRadius.circular(26),
-                        child: Container(
-                          width: double.infinity,
-                          height: 96,
-                          clipBehavior: Clip.antiAlias,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(26),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.92),
-                              width: 1.2,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x22000000),
-                                blurRadius: 24,
-                                offset: Offset(0, 14),
-                              ),
-                              BoxShadow(
-                                color: Color(0x12FFFFFF),
-                                blurRadius: 1,
-                                offset: Offset(0, -1),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            children: [
-                              const Positioned(
-                                left: 20,
-                                top: 0,
-                                bottom: 0,
-                                right: 116,
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    '제품과 관련된 질문은\n저에게 물어보세요!',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      height: 1.42,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF231E1D),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                right: -2,
-                                bottom: -10,
-                                child: Image.asset(
-                                  _characterAssetForMode(AssistantMode.idle),
-                                  width: 120,
-                                  height: 120,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Center(
-                        child: Text(
-                          'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            color: Colors.black.withValues(alpha: 0.34),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildWelcomeComposer(),
-                      const SizedBox(height: 10),
-                    ],
-                  ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -54,
+              right: -32,
+              child: Container(
+                width: 188,
+                height: 188,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFE0DD).withValues(alpha: 0.9),
                 ),
               ),
-              _buildWelcomeNavigation(),
-            ],
-          ),
+            ),
+            Positioned(
+              top: 228,
+              left: -64,
+              child: Container(
+                width: 176,
+                height: 176,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFF0EB).withValues(alpha: 0.96),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ChatThinQ',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF221D1C),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            '$_displayName님을 위한 맞춤 안내',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black.withValues(alpha: 0.88),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '생성형 AI를 활용한 스마트 어시스턴트로\n더 나은 자가진단과 손쉬운 대처를 경험해보세요.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              height: 1.55,
+                              color: Colors.black.withValues(alpha: 0.56),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFE4DC),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'NEW',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFFDF514C),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            '궁금증을 해결해줄 새로운 해결사',
+                            style: TextStyle(
+                              fontSize: 18,
+                              height: 1.24,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF231D1C),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          InkWell(
+                            onTap: _openChatHome,
+                            borderRadius: BorderRadius.circular(30),
+                            child: Ink(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(
+                                18,
+                                18,
+                                12,
+                                16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.94),
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x16000000),
+                                    blurRadius: 22,
+                                    offset: Offset(0, 14),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          width: 30,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                            color: const Color(
+                                              0xFFE86A59,
+                                            ).withValues(alpha: 0.24),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        const Text(
+                                          '제품과 관련된 질문은\n저에게 물어보세요!',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            height: 1.36,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF231E1D),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          '터치해서 바로 대화를 시작해보세요',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.42,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 112,
+                                    height: 112,
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      alignment: Alignment.center,
+                                      children: [
+                                        Container(
+                                          width: 108,
+                                          height: 108,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Color(0xFFFFE9E7),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          right: -4,
+                                          bottom: -4,
+                                          child: Image.asset(
+                                            _characterAssetForMode(
+                                              AssistantMode.idle,
+                                            ),
+                                            width: 112,
+                                            height: 112,
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Center(
+                            child: Text(
+                              'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color: Colors.black.withValues(alpha: 0.34),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          _buildWelcomeComposer(),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _buildWelcomeNavigation(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1411,13 +1480,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 10,
-                            height: 6,
+                            width: 7,
+                            height: 7,
                             decoration: BoxDecoration(
                               color: _serverHealthy
                                   ? const Color(0xFF25B069)
                                   : const Color(0xFFE4664B),
-                              borderRadius: BorderRadius.circular(999),
+                              shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -1854,13 +1923,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 10,
-                  height: 6,
+                  width: 7,
+                  height: 7,
                   decoration: BoxDecoration(
                     color: _serverHealthy
                         ? const Color(0xFF25B069)
                         : const Color(0xFFE4664B),
-                    borderRadius: BorderRadius.circular(999),
+                    shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -1900,36 +1969,64 @@ class _MobileHomePageState extends State<MobileHomePage> {
             colors: [Color(0xFFFFFBF7), Color(0xFFFFF1EB), Color(0xFFFFECE6)],
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              if (_history.isNotEmpty) _buildChatHeader(),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    _history.isEmpty ? 12 : 4,
-                    16,
-                    0,
-                  ),
-                  child: Column(
-                    children: [
-                      if (_errorMessage != null) ...[
-                        _buildErrorCard(),
-                        const SizedBox(height: 10),
-                      ],
-                      Expanded(
-                        child: _history.isEmpty
-                            ? _buildChatIntroPanel()
-                            : _buildConversationPanel(),
-                      ),
-                    ],
-                  ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 42,
+              left: -36,
+              child: Container(
+                width: 164,
+                height: 164,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFF0EB).withValues(alpha: 0.94),
                 ),
               ),
-              _buildComposer(),
-            ],
-          ),
+            ),
+            Positioned(
+              top: 118,
+              right: -40,
+              child: Container(
+                width: 196,
+                height: 196,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFFE6E0).withValues(alpha: 0.82),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  if (_history.isNotEmpty) _buildChatHeader(),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        _history.isEmpty ? 12 : 4,
+                        16,
+                        0,
+                      ),
+                      child: Column(
+                        children: [
+                          if (_errorMessage != null) ...[
+                            _buildErrorCard(),
+                            const SizedBox(height: 10),
+                          ],
+                          Expanded(
+                            child: _history.isEmpty
+                                ? _buildChatIntroPanel()
+                                : _buildConversationPanel(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _buildComposer(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2077,13 +2174,30 @@ class RobotIllustration extends StatelessWidget {
       AssistantMode.replying => 'assets/characters/replying.png',
     };
 
-    return Center(
-      child: Image.asset(
-        imagePath,
-        width: 148,
-        height: 148,
-        fit: BoxFit.contain,
-      ),
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 146,
+          height: 146,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFD6DE), Color(0xFFFFEFF4)],
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x18D96C70),
+                blurRadius: 24,
+                offset: Offset(0, 12),
+              ),
+            ],
+          ),
+        ),
+        Image.asset(imagePath, width: 148, height: 148, fit: BoxFit.contain),
+      ],
     );
   }
 }
@@ -2581,3 +2695,6 @@ class ChatTurn {
 
   Map<String, String> toJson() => {'user': user, 'assistant': assistant};
 }
+
+
+
