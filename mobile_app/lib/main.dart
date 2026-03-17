@@ -1020,13 +1020,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'ChatThinQ',
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF221D1C),
-                            ),
+                          Row(
+                            children: [
+                              const Text(
+                                'ChatThinQ',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF221D1C),
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  tooltip: '연결 설정',
+                                  onPressed: _openSettings,
+                                  icon: const Icon(Icons.tune_rounded, size: 18),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 20),
                           Text(
