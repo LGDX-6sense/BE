@@ -486,6 +486,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _recordedVoiceName = null;
         _errorMessage = null;
       });
+      _startRecordingUiTimer();
     } catch (error) {
       if (!mounted) {
         return;
@@ -495,12 +496,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _isRecordingVoice = false;
         _errorMessage = '녹음을 시작하지 못했습니다: $error';
       });
+      _stopRecordingUiTimer();
     }
   }
 
   Future<void> _stopVoiceRecording() async {
     try {
       final savedPath = await _voiceRecorder.stop();
+      _stopRecordingUiTimer();
       if (!mounted) {
         return;
       }
@@ -525,6 +528,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _isRecordingVoice = false;
         _errorMessage = '녹음을 종료하지 못했습니다: $error';
       });
+      _stopRecordingUiTimer();
     }
   }
 
@@ -578,18 +582,21 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _recordedNoiseName = null;
         _errorMessage = null;
       });
+      _startRecordingUiTimer();
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _isRecordingNoise = false;
         _errorMessage = '소음 녹음을 시작하지 못했습니다: $error';
       });
+      _stopRecordingUiTimer();
     }
   }
 
   Future<void> _stopNoiseRecording() async {
     try {
       final savedPath = await _voiceRecorder.stop();
+      _stopRecordingUiTimer();
       if (!mounted) return;
 
       setState(() {
@@ -608,7 +615,39 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _isRecordingNoise = false;
         _errorMessage = '소음 녹음을 종료하지 못했습니다: $error';
       });
+      _stopRecordingUiTimer();
     }
+  }
+
+  Future<void> _cancelActiveRecording() async {
+    if (!_isRecordingActive) {
+      return;
+    }
+
+    try {
+      final savedPath = await _voiceRecorder.stop();
+      if (savedPath != null && savedPath.isNotEmpty) {
+        final file = File(savedPath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      }
+    } catch (_) {}
+
+    _stopRecordingUiTimer();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isRecordingVoice = false;
+      _isRecordingNoise = false;
+      _recordedVoice = null;
+      _recordedVoiceName = null;
+      _recordedNoise = null;
+      _recordedNoiseName = null;
+      _errorMessage = null;
+    });
   }
 
   Future<void> _handleMicTap() async {
@@ -1052,6 +1091,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_isRecordingNoise) {
       await _stopNoiseRecording();
     }
+    _stopRecordingUiTimer();
     await _stopSpeaking();
     if (!mounted) {
       return;
@@ -1737,26 +1777,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
       );
     }
 
-    if (_isRecordingVoice) {
-      chips.add(
-        const Chip(
-          avatar: Icon(Icons.fiber_manual_record_rounded, color: Colors.red),
-          label: Text('녹음 중'),
-          backgroundColor: Color(0xFFFFEEEA),
-        ),
-      );
-    }
-
-    if (_isRecordingNoise) {
-      chips.add(
-        const Chip(
-          avatar: Icon(Icons.graphic_eq_rounded, color: Colors.orange),
-          label: Text('소음 녹음 중'),
-          backgroundColor: Color(0xFFFFF3E0),
-        ),
-      );
-    }
-
     return chips;
   }
 
@@ -2261,115 +2281,242 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   child: Wrap(spacing: 6, runSpacing: 6, children: chips),
                 ),
               ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x12000000),
-                    blurRadius: 16,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
+            _isRecordingActive
+                ? _buildRecordingComposer()
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF4F0),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: IconButton(
-                      tooltip: '첨부 메뉴 열기',
-                      onPressed: _isSubmitting ? null : _openAttachmentSheet,
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        Icons.add_rounded,
-                        color: _modePresentation.accent,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      enabled: !_isSubmitting,
-                      minLines: 1,
-                      maxLines: 4,
-                      style: const TextStyle(fontSize: 12.5, height: 1.45),
-                      decoration: InputDecoration(
-                        hintText: _modePresentation.hintText,
-                        filled: false,
-                        fillColor: Colors.transparent,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 0,
-                          vertical: 10,
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x12000000),
+                          blurRadius: 16,
+                          offset: Offset(0, 8),
                         ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                      ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: showMicAction ? const Color(0xFFFFF4F0) : null,
-                      gradient: showMicAction
-                          ? null
-                          : const LinearGradient(
-                              colors: [Color(0xFFE9524A), Color(0xFFCA4156)],
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF4F0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            tooltip: '첨부 메뉴 열기',
+                            onPressed: _isSubmitting
+                                ? null
+                                : _openAttachmentSheet,
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              Icons.add_rounded,
+                              color: _modePresentation.accent,
+                              size: 20,
                             ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: _isSubmitting
-                            ? null
-                            : (showMicAction ? _handleMicTap : _sendMessage),
-                        icon: _isSubmitting
-                            ? const SizedBox.square(
-                                dimension: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Icon(
-                                showMicAction
-                                    ? ((_isRecordingVoice || _isRecordingNoise)
-                                          ? Icons.stop_circle_rounded
-                                          : Icons.mic_none_rounded)
-                                    : Icons.arrow_upward_rounded,
-                                size: 18,
-                                color: showMicAction
-                                    ? (_isRecordingVoice
-                                          ? const Color(0xFFCA4156)
-                                          : _isRecordingNoise
-                                          ? const Color(0xFFE07A00)
-                                          : Colors.black.withValues(
-                                              alpha: 0.36,
-                                            ))
-                                    : Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _messageController,
+                            enabled: !_isSubmitting,
+                            minLines: 1,
+                            maxLines: 4,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.45,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: _modePresentation.hintText,
+                              filled: false,
+                              fillColor: Colors.transparent,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 0,
+                                vertical: 10,
                               ),
-                      ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: showMicAction
+                                ? const Color(0xFFFFF4F0)
+                                : null,
+                            gradient: showMicAction
+                                ? null
+                                : const LinearGradient(
+                                    colors: [
+                                      Color(0xFFE9524A),
+                                      Color(0xFFCA4156),
+                                    ],
+                                  ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : (showMicAction
+                                        ? _handleMicTap
+                                        : _sendMessage),
+                              icon: _isSubmitting
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Icon(
+                                      showMicAction
+                                          ? Icons.mic_none_rounded
+                                          : Icons.arrow_upward_rounded,
+                                      size: 18,
+                                      color: showMicAction
+                                          ? Colors.black.withValues(alpha: 0.36)
+                                          : Colors.white,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecordingComposer() {
+    final accent = _isRecordingVoice
+        ? const Color(0xFFCA4156)
+        : const Color(0xFFE07A00);
+    final title = _isRecordingVoice ? '말하기 녹음 중' : '소음 녹음 중';
+    final subtitle = _isRecordingVoice
+        ? '말한 내용을 텍스트로 바꿔요'
+        : '제품 소리를 분석용으로 저장해요';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF4F1EE),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _isRecordingVoice ? Icons.mic_rounded : Icons.graphic_eq_rounded,
+              color: accent,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatRecordingElapsed(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    height: 1.25,
+                    color: Colors.black.withValues(alpha: 0.46),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _RecordingWaveform(seed: _recordingWaveSeed, color: accent),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          _RecordingActionButton(
+            tooltip: '녹음 종료',
+            icon: Icons.stop_rounded,
+            fillColor: accent.withValues(alpha: 0.12),
+            iconColor: accent,
+            onPressed: _handleMicTap,
+          ),
+          const SizedBox(width: 8),
+          _RecordingActionButton(
+            tooltip: '녹음 취소',
+            icon: Icons.close_rounded,
+            fillColor: const Color(0xFFF6F4F2),
+            iconColor: Colors.black.withValues(alpha: 0.62),
+            onPressed: _cancelActiveRecording,
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF3F1EF),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.send_rounded,
+              size: 18,
+              color: Colors.black.withValues(alpha: 0.16),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3169,6 +3316,82 @@ class _MicBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: const Icon(Icons.mic_rounded, size: 22),
+    );
+  }
+}
+
+class _RecordingActionButton extends StatelessWidget {
+  const _RecordingActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.fillColor,
+    required this.iconColor,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final Color fillColor;
+  final Color iconColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(color: fillColor, shape: BoxShape.circle),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, size: 18, color: iconColor),
+      ),
+    );
+  }
+}
+
+class _RecordingWaveform extends StatelessWidget {
+  const _RecordingWaveform({required this.seed, required this.color});
+
+  final int seed;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 24,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth.clamp(0, 260).toDouble();
+          final barCount = math.max(18, (availableWidth / 7).floor());
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(barCount, (index) {
+              final phase = (seed * 0.38) + (index * 0.72);
+              final intensity =
+                  ((math.sin(phase) + math.cos(phase * 0.6 + 1.2)) + 2) / 4;
+              final height = 5 + (intensity * 17);
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 3,
+                  height: height,
+                  decoration: BoxDecoration(
+                    color: color.withValues(
+                      alpha: index.isEven ? 0.95 : 0.45 + (intensity * 0.4),
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
+      ),
     );
   }
 }
