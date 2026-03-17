@@ -2230,7 +2230,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             SafeArea(
               child: Column(
                 children: [
-                  if (_history.isNotEmpty) _buildChatHeader(),
+                  _buildChatHeader(),
                   Expanded(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
