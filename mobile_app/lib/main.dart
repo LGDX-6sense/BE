@@ -1089,55 +1089,86 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                             ),
                                           ),
                                         ),
-                                        const SizedBox(height: 14),
+                                        const SizedBox(height: 8),
                                         const Text(
-                                          '제품과 관련된 질문은\n저에게 물어보세요!',
+                                          '궁금증을 해결해줄 새로운 해결사',
                                           style: TextStyle(
-                                            fontSize: 14,
-                                            height: 1.36,
-                                            fontWeight: FontWeight.w800,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
                                             color: Color(0xFF231E1D),
                                           ),
                                         ),
                                         const SizedBox(height: 10),
-                                        Text(
-                                          '터치해서 바로 대화를 시작해보세요',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.black.withValues(
-                                              alpha: 0.42,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  SizedBox(
-                                    width: 112,
-                                    height: 112,
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      alignment: Alignment.center,
-                                      children: [
                                         Container(
-                                          width: 108,
-                                          height: 108,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Color(0xFFFFE9E7),
+                                          padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Color(0x18000000),
+                                                blurRadius: 10,
+                                                offset: Offset(0, 4),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                        Positioned(
-                                          right: -4,
-                                          bottom: -4,
-                                          child: Image.asset(
-                                            _characterAssetForMode(
-                                              AssistantMode.idle,
-                                            ),
-                                            width: 112,
-                                            height: 112,
-                                            fit: BoxFit.contain,
+                                          
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text(
+                                                      '제품과 관련된 질문은\n저에게 물어보세요!',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        height: 1.36,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: Color(0xFF231E1D),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Text(
+                                                      '터치해서 바로 대화를 시작해보세요',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.black.withValues(alpha: 0.42),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              SizedBox(
+                                                width: 112,
+                                                height: 112,
+                                                child: Stack(
+                                                  clipBehavior: Clip.none,
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    Container(
+                                                      width: 108,
+                                                      height: 108,
+                                                      decoration: const BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: Color(0xFFFFE9E7),
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      right: -4,
+                                                      bottom: -4,
+                                                      child: Image.asset(
+                                                        _characterAssetForMode(AssistantMode.idle),
+                                                        width: 112,
+                                                        height: 112,
+                                                        fit: BoxFit.contain,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
