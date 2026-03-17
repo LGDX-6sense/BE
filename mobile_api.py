@@ -197,6 +197,7 @@ def health() -> Dict[str, Any]:
 @app.post("/api/chat")
 async def chat(
     message: str = Form(""),
+    user_name: str = Form(""),
     history_json: str = Form("[]"),
     top_k: int = Form(DEFAULT_TOP_K),
     image: Optional[UploadFile] = File(default=None),
@@ -240,6 +241,7 @@ async def chat(
             image_path=str(image_path) if image_path else None,
             audio_path=str(audio_path) if audio_path else None,
             top_k=top_k,
+            user_name=user_name,
         )
 
         user_message = build_user_message(

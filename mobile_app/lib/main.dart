@@ -273,7 +273,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Future<void> _speakText(String text) async {
-    final trimmed = text.trim();
+    final trimmed = _stripSimpleMarkdown(text).trim();
     if (trimmed.isEmpty) {
       return;
     }
@@ -740,6 +740,51 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   String _basename(String path) => path.split(RegExp(r'[\\/]')).last;
 
+  String _stripSimpleMarkdown(String text) {
+    return text.replaceAllMapped(
+      RegExp(r'\*\*(.*?)\*\*', dotAll: true),
+      (match) => match.group(1) ?? '',
+    );
+  }
+
+  List<InlineSpan> _buildMessageTextSpans({
+    required String message,
+    required TextStyle baseStyle,
+  }) {
+    final spans = <InlineSpan>[];
+    final pattern = RegExp(r'\*\*(.*?)\*\*', dotAll: true);
+    var cursor = 0;
+
+    for (final match in pattern.allMatches(message)) {
+      if (match.start > cursor) {
+        spans.add(
+          TextSpan(
+            text: message.substring(cursor, match.start),
+            style: baseStyle,
+          ),
+        );
+      }
+
+      spans.add(
+        TextSpan(
+          text: match.group(1) ?? '',
+          style: baseStyle.copyWith(fontWeight: FontWeight.w800),
+        ),
+      );
+      cursor = match.end;
+    }
+
+    if (cursor < message.length) {
+      spans.add(TextSpan(text: message.substring(cursor), style: baseStyle));
+    }
+
+    if (spans.isEmpty) {
+      spans.add(TextSpan(text: message, style: baseStyle));
+    }
+
+    return spans;
+  }
+
   Future<void> _sendMessage() async {
     if (_isSubmitting) {
       return;
@@ -776,6 +821,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       final request =
           http.MultipartRequest('POST', Uri.parse('$_baseUrl/api/chat'))
             ..fields['message'] = message
+            ..fields['user_name'] = _displayName
             ..fields['history_json'] = jsonEncode(
               _history.map((turn) => turn.toJson()).toList(),
             );
@@ -1573,6 +1619,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildBubble(String message, {required bool isUser}) {
     final bubbleColor = isUser ? const Color(0xFFF06A5D) : Colors.white;
     final foreground = isUser ? Colors.white : const Color(0xFF312726);
+    final baseTextStyle = TextStyle(
+      color: foreground,
+      fontSize: 13,
+      height: 1.48,
+      fontWeight: FontWeight.w500,
+    );
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -1632,13 +1684,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ],
               ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: foreground,
-                  fontSize: 13,
-                  height: 1.48,
-                  fontWeight: FontWeight.w500,
+              child: Text.rich(
+                TextSpan(
+                  children: _buildMessageTextSpans(
+                    message: message,
+                    baseStyle: baseTextStyle,
+                  ),
                 ),
               ),
             ),
@@ -1818,7 +1869,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           height: 1.45,
         ),
       ),
-    ); 
+    );
   }
 
   Widget _buildStarterPanel() {

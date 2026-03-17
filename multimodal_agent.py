@@ -99,6 +99,7 @@ class RetrievedContext:
 class AgentEvidenceBundle:
     user_text: str
     device_hint: str
+    user_name: str = ""
     audio: Optional[AudioEvidence] = None
     image: Optional[ImageEvidence] = None
     warnings: List[str] = field(default_factory=list)
@@ -511,6 +512,7 @@ def build_context_block(contexts: Sequence[RetrievedContext]) -> str:
 def build_evidence_payload(bundle: AgentEvidenceBundle) -> Dict[str, Any]:
     """Convert internal evidence into prompt-friendly JSON."""
     return {
+        "user_name": bundle.user_name,
         "user_text": bundle.user_text,
         "device_hint": bundle.device_hint,
         "audio": asdict(bundle.audio) if bundle.audio else None,
@@ -518,6 +520,16 @@ def build_evidence_payload(bundle: AgentEvidenceBundle) -> Dict[str, Any]:
         "warnings": bundle.warnings,
         "retrieved_contexts": [asdict(context) for context in bundle.retrieved_contexts],
     }
+
+
+def format_display_name(user_name: str) -> str:
+    """Normalize a user display name for friendly Korean output."""
+    normalized = normalize_whitespace(user_name)
+    if not normalized:
+        return "고객"
+    if normalized.endswith("님"):
+        return normalized[:-1].strip() or "고객"
+    return normalized
 
 
 def summarize_empty_response(response: Any) -> str:
@@ -556,14 +568,25 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
     ensure_openai()
     client = OpenAI()
     evidence_json = json.dumps(build_evidence_payload(bundle), ensure_ascii=False, indent=2)
+    display_name = format_display_name(bundle.user_name)
+    opening_line = f"**{display_name}님의 문제를 진단해봤어요!**"
 
     instructions = (
         "You are an appliance diagnosis agent. "
         "Combine the user's text, local audio classifier output, image analysis, and LG support context. "
-        "Do not overstate certainty. If evidence is weak or conflicting, say so. "
-        "Write the final answer in Korean. "
-        "If warnings indicate a missing modality result, briefly acknowledge that limitation. "
-        "Use these exact section headings: Summary, Evidence, Likely causes, Self-check steps, Service recommendation, Follow-up question."
+        "Write the final answer in very easy Korean for a non-technical user. "
+        "Only say things that are supported by the evidence. "
+        "If something is uncertain, do not present it as fact. "
+        "Instead say clearly that it is hard to be certain and describe it as a possibility. "
+        "Do not use English section headings. "
+        "Do not use markdown except for the first bold sentence. "
+        f"Start the answer with this exact sentence: {opening_line} "
+        "In the next sentence, explain the current symptom in this style: '현재 증상은 ... 상황이에요.' "
+        "Then write this sentence exactly: '이러한 상황에서는 다음과 같이 대처해보세요.' "
+        "After that, provide 2 to 5 numbered steps in order. "
+        "Each step should be short, concrete, and easy to follow. "
+        "If service is recommended, mention it in the last numbered step or a short final sentence. "
+        "If warnings indicate a missing modality result, briefly mention that limitation in simple Korean."
     )
 
     user_prompt = (
@@ -572,7 +595,8 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         "Relevant LG support context:\n"
         f"{build_context_block(bundle.retrieved_contexts)}\n\n"
         "Write a concise support response for an end user. "
-        "If an extra image, audio clip, or symptom detail would improve confidence, ask for the single best next input."
+        "Use plain, everyday Korean and avoid technical jargon when a simpler explanation is possible. "
+        "If the evidence is not enough for a confident diagnosis, say that clearly and ask for only the single most useful next input."
     )
 
     primary_model = resolve_openai_model(DEFAULT_AGENT_MODEL, "gpt-5-mini")
@@ -611,6 +635,7 @@ def run_agent(
     audio_path: Optional[str] = None,
     top_k: int = DEFAULT_TOP_K,
     vector_store_id: Optional[str] = None,
+    user_name: str = "",
 ) -> Dict[str, Any]:
     """Run the full multimodal agent pipeline and return structured output."""
     warnings: List[str] = []
@@ -634,6 +659,7 @@ def run_agent(
     bundle = AgentEvidenceBundle(
         user_text=normalize_whitespace(user_text),
         device_hint=device_hint,
+        user_name=normalize_whitespace(user_name),
         audio=audio_evidence,
         image=image_evidence,
         warnings=warnings,
