@@ -977,6 +977,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildWelcomeScreen() {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFFFBF8),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const Text(
+          'ChatThinQ',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: const [
+                BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+              ],
+            ),
+            child: IconButton(
+              tooltip: '연결 설정',
+              onPressed: _openSettings,
+              icon: const Icon(Icons.tune_rounded, size: 20),
+            ),
+          ),
+        ],
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -1020,33 +1046,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'ChatThinQ',
-                                style: TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF221D1C),
-                                ),
-                              ),
-                              const Spacer(),
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  tooltip: '연결 설정',
-                                  onPressed: _openSettings,
-                                  icon: const Icon(Icons.tune_rounded, size: 18),
-                                ),
-                              ),
-                            ],
-                          ),
                           const SizedBox(height: 20),
                           Text(
                             '$_displayName님을 위한 맞춤 안내',
@@ -2140,32 +2139,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
     );
   }
 
-  Widget _buildChatHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              onPressed: () => setState(() => _showWelcomeScreen = true),
-              icon: const Icon(Icons.chevron_left_rounded, size: 20),
-            ),
+  Widget _buildChatScreen() {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFFFBF7),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Container(
+          margin: const EdgeInsets.only(left: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(width: 10),
-          const Text(
-            'ChatThinQ',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          child: IconButton(
+            padding: EdgeInsets.zero,
+            onPressed: () => setState(() => _showWelcomeScreen = true),
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
           ),
-          const Spacer(),
+        ),
+        title: const Text(
+          'ChatThinQ',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        actions: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            margin: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(999),
@@ -2185,33 +2184,26 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  _isCheckingConnection ? '백엔드 확인 중' : _serverStatus,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  _isCheckingConnection ? '확인 중' : _serverStatus,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 6),
-          _HeroActionButton(
+          const SizedBox(width: 4),
+          IconButton(
             tooltip: '연결 설정',
-            icon: Icons.tune_rounded,
             onPressed: _openSettings,
+            icon: const Icon(Icons.tune_rounded, size: 20),
           ),
-          _HeroActionButton(
+          IconButton(
             tooltip: '대화 초기화',
-            icon: Icons.refresh_rounded,
             onPressed: _resetConversation,
+            icon: const Icon(Icons.refresh_rounded, size: 20),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-    );
-  }
-
-  Widget _buildChatScreen() {
-    return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -2249,7 +2241,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
             SafeArea(
               child: Column(
                 children: [
-                  _buildChatHeader(),
                   Expanded(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
