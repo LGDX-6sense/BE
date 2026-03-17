@@ -740,6 +740,46 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   String _basename(String path) => path.split(RegExp(r'[\\/]')).last;
 
+  List<String> _compactNonEmptyStrings(Iterable<String?> values) {
+    final items = <String>[];
+    for (final value in values) {
+      if (value != null && value.trim().isNotEmpty) {
+        items.add(value);
+      }
+    }
+    return items;
+  }
+
+  String _buildDisplayedUserMessage({
+    required String message,
+    String voiceTranscript = '',
+    String? imageName,
+    List<String> audioNames = const [],
+    String? voiceName,
+  }) {
+    final parts = <String>[];
+
+    if (message.trim().isNotEmpty) {
+      parts.add(message.trim());
+    }
+    if (voiceTranscript.trim().isNotEmpty) {
+      parts.add('음성 입력: ${voiceTranscript.trim()}');
+    }
+    if (imageName != null && imageName.trim().isNotEmpty) {
+      parts.add('[이미지 첨부: ${imageName.trim()}]');
+    }
+    for (final audioName in audioNames) {
+      if (audioName.trim().isNotEmpty) {
+        parts.add('[오디오 첨부: ${audioName.trim()}]');
+      }
+    }
+    if (voiceName != null && voiceName.trim().isNotEmpty) {
+      parts.add('[음성 메시지: ${voiceName.trim()}]');
+    }
+
+    return parts.isEmpty ? '[입력 없음]' : parts.join('\n');
+  }
+
   Future<void> _sendMessage() async {
     if (_isSubmitting) {
       return;
@@ -773,6 +813,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
     });
 
     try {
+      final selectedImageName = _selectedImageName;
+      final selectedAudioName = _selectedAudioName;
+      final recordedVoiceName = _recordedVoiceName;
+      final recordedNoiseName = _recordedNoiseName;
+      final submittedVoiceMessage = _recordedVoice != null;
+
       final request =
           http.MultipartRequest('POST', Uri.parse('$_baseUrl/api/chat'))
             ..fields['message'] = message
@@ -848,10 +894,48 @@ class _MobileHomePageState extends State<MobileHomePage> {
         }
       }
 
+      final voiceTranscript =
+          decoded['voice_transcript']?.toString().trim() ?? '';
+      final displayUserMessage = _buildDisplayedUserMessage(
+        message: message,
+        voiceTranscript: voiceTranscript,
+        imageName: selectedImageName,
+        audioNames: _compactNonEmptyStrings([
+          selectedAudioName,
+          recordedNoiseName,
+        ]),
+        voiceName: recordedVoiceName,
+      );
       final assistantMessage =
           decoded['assistant_message']?.toString().trim() ??
           (nextHistory.isNotEmpty ? nextHistory.last.assistant : '');
       final shouldSpeak = _autoSpeak && assistantMessage.isNotEmpty;
+
+      if (nextHistory.isEmpty &&
+          (displayUserMessage != '[입력 없음]' || assistantMessage.isNotEmpty)) {
+        nextHistory.add(
+          ChatTurn(user: displayUserMessage, assistant: assistantMessage),
+        );
+      } else if (nextHistory.isNotEmpty) {
+        final lastTurn = nextHistory.last;
+        final needsVoiceTranscriptPatch =
+            voiceTranscript.isNotEmpty &&
+            !lastTurn.user.contains(voiceTranscript);
+        final needsFallbackUserMessage =
+            lastTurn.user.trim().isEmpty || lastTurn.user.trim() == '[입력 없음]';
+
+        if (displayUserMessage != '[입력 없음]' &&
+            (submittedVoiceMessage ||
+                needsVoiceTranscriptPatch ||
+                needsFallbackUserMessage)) {
+          nextHistory[nextHistory.length - 1] = ChatTurn(
+            user: displayUserMessage,
+            assistant: lastTurn.assistant.isNotEmpty
+                ? lastTurn.assistant
+                : assistantMessage,
+          );
+        }
+      }
 
       if (!mounted) {
         return;
