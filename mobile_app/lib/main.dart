@@ -125,7 +125,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _baseUrlController.text = _defaultBaseUrlOverride.isNotEmpty
         ? _defaultBaseUrlOverride
         : (Platform.isAndroid
-              ? 'http://10.0.2.2:8000'
+              ? 'http://192.168.0.13:8000'
               : 'http://127.0.0.1:8000');
     unawaited(_configureTts());
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkConnection());
@@ -1011,38 +1011,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
             colors: [Color(0xFFFFFBF8), Color(0xFFFFF3EE), Color(0xFFFFECE6)],
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -54,
-              right: -32,
-              child: Container(
-                width: 188,
-                height: 188,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFFE0DD).withValues(alpha: 0.9),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 228,
-              left: -64,
-              child: Container(
-                width: 176,
-                height: 176,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFFF0EB).withValues(alpha: 0.96),
-                ),
-              ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1065,38 +1039,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFE4DC),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: const Text(
-                              'NEW',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFFDF514C),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            '궁금증을 해결해줄 새로운 해결사',
-                            style: TextStyle(
-                              fontSize: 18,
-                              height: 1.24,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF231D1C),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
+                          
                           InkWell(
                             onTap: _openChatHome,
-                            borderRadius: BorderRadius.circular(30),
+                            borderRadius: BorderRadius.circular(24),
                             child: Ink(
                               width: double.infinity,
                               padding: const EdgeInsets.fromLTRB(
@@ -1106,16 +1052,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                 16,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(30),
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.94),
+                                  color: const Color(0xFFE8D0CB),
+                                  width: 1.5,
                                 ),
                                 boxShadow: const [
                                   BoxShadow(
-                                    color: Color(0x16000000),
-                                    blurRadius: 22,
-                                    offset: Offset(0, 14),
+                                    color: Color(0x26000000),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 8),
                                   ),
                                 ],
                               ),
@@ -1127,14 +1074,18 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Container(
-                                          width: 30,
-                                          height: 4,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                           decoration: BoxDecoration(
-                                            color: const Color(
-                                              0xFFE86A59,
-                                            ).withValues(alpha: 0.24),
-                                            borderRadius: BorderRadius.circular(
-                                              999,
+                                            color: const Color.fromARGB(255, 255, 133, 129),
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: const Text(
+                                            'NEW',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                              letterSpacing: 0.5,
                                             ),
                                           ),
                                         ),
@@ -1218,9 +1169,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -2212,36 +2161,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             colors: [Color(0xFFFFFBF7), Color(0xFFFFF1EB), Color(0xFFFFECE6)],
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: 42,
-              left: -36,
-              child: Container(
-                width: 164,
-                height: 164,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFFF0EB).withValues(alpha: 0.94),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 118,
-              right: -40,
-              child: Container(
-                width: 196,
-                height: 196,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFFE6E0).withValues(alpha: 0.82),
-                ),
-              ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
                         16,
@@ -2268,9 +2191,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 

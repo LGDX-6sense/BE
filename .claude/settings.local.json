@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \"from PIL import Image; print\\(''PIL OK''\\)\")"
+      "Bash(python -c \"from PIL import Image; print\\(''PIL OK''\\)\")",
+      "Bash(xargs grep:*)",
+      "Bash(ipconfig)"
     ]
   }
 }
