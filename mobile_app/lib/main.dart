@@ -1818,7 +1818,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           height: 1.45,
         ),
       ),
-    );
+    ); 
   }
 
   Widget _buildStarterPanel() {
