@@ -1,4 +1,4 @@
-/// ignore_for_file: unused_element
+// ignore_for_file: unused_element
 
 import 'dart:async';
 import 'dart:convert';
@@ -156,7 +156,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_selectedImage != null) {
       return AssistantMode.photo;
     }
-    if (_isRecordingVoice || _isRecordingNoise || _selectedAudio != null || _recordedVoice != null || _recordedNoise != null) {
+    if (_isRecordingVoice ||
+        _isRecordingNoise ||
+        _selectedAudio != null ||
+        _recordedVoice != null ||
+        _recordedNoise != null) {
       return AssistantMode.audio;
     }
     return AssistantMode.idle;
@@ -187,7 +191,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return const _ModePresentation(
           label: 'AI CHAT · Listening Sound Ver',
           title: '소리를 듣고 있어요.\n정확한 진단을 위해\n주변 소음을 차단해주세요.',
-          description: '녹음을 계속하거나 폴더의 음성 파일을 붙인 뒤 메시지를 보내주세요.',
+          description: '말하기(STT)와 소음 녹음을 구분해서 인식하고 처리해요.',
           hintText: '소리 특징을 텍스트로 입력해주세요',
           gradientColors: [Color(0xFFFFF4F1), Color(0xFFFFD9D2)],
           accent: Color(0xFFE95A4D),
@@ -214,7 +218,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return const _ModePresentation(
           label: 'AI CHAT · Normal Ver',
           title: '안녕하세요 고객님\n어떤 문제 상황인가요?',
-          description: '텍스트를 입력하거나 + 버튼으로 사진, 녹음, 음성 파일을 함께 보낼 수 있어요.',
+          description:
+              '텍스트를 입력하거나 + 버튼으로 사진과 파일을, 마이크 버튼으로 STT 또는 소음 녹음을 선택할 수 있어요.',
           hintText: '텍스트를 입력해주세요',
           gradientColors: [Color(0xFFFFF7F3), Color(0xFFFFDCD6)],
           accent: Color(0xFFE9524A),
@@ -417,7 +422,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final outputPath =
-          '${tempDir.path}${Platform.pathSeparator}voice_message_$timestamp.m4a';
+          '${tempDir.path}${Platform.pathSeparator}recorded_audio_$timestamp.m4a';
 
       await _voiceRecorder.start(
         const RecordConfig(
@@ -511,11 +516,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final outputPath =
-          '${tempDir.path}${Platform.pathSeparator}noise_recording_$timestamp.m4a';
+          '${tempDir.path}${Platform.pathSeparator}noise_recording_$timestamp.wav';
 
       await _voiceRecorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.aacLc,
+          encoder: AudioEncoder.wav,
           sampleRate: 22050,
           numChannels: 1,
           autoGain: false,
@@ -569,11 +574,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Future<void> _handleMicTap() async {
     if (_isRecordingVoice) {
       await _stopVoiceRecording();
-    } else if (_isRecordingNoise) {
-      await _stopNoiseRecording();
-    } else {
-      await _showMicModeSheet();
+      return;
     }
+    if (_isRecordingNoise) {
+      await _stopNoiseRecording();
+      return;
+    }
+    await _showMicModeSheet();
   }
 
   Future<void> _showMicModeSheet() async {
@@ -666,94 +673,64 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(sheetContext).size.height * 0.74,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF8),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 18),
+                ),
+              ],
             ),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFBF8),
-                borderRadius: BorderRadius.circular(32),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 28,
-                    offset: Offset(0, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '첨부 방법 선택',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '원하는 방법을 선택해주세요',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Colors.black.withValues(alpha: 0.56),
                   ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                const SizedBox(height: 14),
+                Row(
                   children: [
-                    const Text(
-                      '첨부 방법 선택',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                    Expanded(
+                      child: _AttachmentQuickAction(
+                        icon: Icons.photo_camera_outlined,
+                        label: '카메라',
+                        onTap: () => handleTap(_capturePhoto),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '사진, 갤러리, 녹음, 음성 파일 중 필요한 방식을 골라주세요.',
-                      style: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.58),
-                        height: 1.45,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AttachmentQuickAction(
+                        icon: Icons.image_outlined,
+                        label: '사진',
+                        onTap: () => handleTap(_pickImageFromGallery),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    _AttachmentActionTile(
-                      icon: Icons.camera_alt_rounded,
-                      title: '사진 촬영',
-                      subtitle: '카메라를 열어 바로 사진을 첨부합니다.',
-                      color: const Color(0xFFFFE8E3),
-                      onTap: () => handleTap(_capturePhoto),
-                    ),
-                    _AttachmentActionTile(
-                      icon: Icons.photo_library_rounded,
-                      title: '갤러리에서 가져오기',
-                      subtitle: '기기에 저장된 사진을 선택합니다.',
-                      color: const Color(0xFFFFF0E2),
-                      onTap: () => handleTap(_pickImageFromGallery),
-                    ),
-                    _AttachmentActionTile(
-                      icon: _isRecordingVoice
-                          ? Icons.stop_circle_rounded
-                          : Icons.mic_rounded,
-                      title: _isRecordingVoice ? '음성 녹음 종료' : '음성 녹음 (STT)',
-                      subtitle: _isRecordingVoice
-                          ? '현재 녹음을 저장하고 첨부합니다.'
-                          : '말한 내용을 텍스트로 변환해 전송합니다.',
-                      color: _isRecordingVoice
-                          ? const Color(0xFFFFE0DF)
-                          : const Color(0xFFFFECE8),
-                      onTap: () => handleTap(_toggleVoiceRecording),
-                    ),
-                    _AttachmentActionTile(
-                      icon: _isRecordingNoise
-                          ? Icons.stop_circle_rounded
-                          : Icons.graphic_eq_rounded,
-                      title: _isRecordingNoise ? '소음 녹음 종료' : '소음 녹음',
-                      subtitle: _isRecordingNoise
-                          ? '현재 소음 녹음을 저장하고 첨부합니다.'
-                          : '제품에서 나는 소리를 녹음해 AI가 분석합니다.',
-                      color: _isRecordingNoise
-                          ? const Color(0xFFFFF3E0)
-                          : const Color(0xFFFFF3E0),
-                      onTap: () => handleTap(_toggleNoiseRecording),
-                    ),
-                    _AttachmentActionTile(
-                      icon: Icons.audio_file_rounded,
-                      title: '음성 파일 가져오기',
-                      subtitle: '폴더에 있는 mp3, wav, m4a 파일을 선택합니다.',
-                      color: const Color(0xFFFFF1EC),
-                      onTap: () => handleTap(_pickAudio),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AttachmentQuickAction(
+                        icon: Icons.attach_file_rounded,
+                        label: '파일',
+                        onTap: () => handleTap(_pickAudio),
+                      ),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -992,7 +969,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
               boxShadow: const [
-                BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
             child: IconButton(
@@ -1017,191 +998,209 @@ class _MobileHomePageState extends State<MobileHomePage> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
-                          Text(
-                            '$_displayName님을 위한 맞춤 안내',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black.withValues(alpha: 0.88),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '생성형 AI를 활용한 스마트 어시스턴트로\n더 나은 자가진단과 손쉬운 대처를 경험해보세요.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.55,
-                              color: Colors.black.withValues(alpha: 0.56),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          
-                          InkWell(
-                            onTap: _openChatHome,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      Text(
+                        '$_displayName님을 위한 맞춤 안내',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black.withValues(alpha: 0.88),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '생성형 AI를 활용한 스마트 어시스턴트로\n더 나은 자가진단과 손쉬운 대처를 경험해보세요.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.55,
+                          color: Colors.black.withValues(alpha: 0.56),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      InkWell(
+                        onTap: _openChatHome,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Ink(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(18, 18, 12, 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
-                            child: Ink(
-                              width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(
-                                18,
-                                18,
-                                12,
-                                16,
+                            border: Border.all(
+                              color: const Color(0xFFE8D0CB),
+                              width: 1.5,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x26000000),
+                                blurRadius: 20,
+                                offset: Offset(0, 8),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: const Color(0xFFE8D0CB),
-                                  width: 1.5,
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x26000000),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: const Color.fromARGB(255, 255, 133, 129),
-                                            borderRadius: BorderRadius.circular(999),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color.fromARGB(
+                                          255,
+                                          255,
+                                          133,
+                                          129,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'NEW',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      '궁금증을 해결해줄 새로운 해결사',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontStyle: FontStyle.normal,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color.fromARGB(255, 0, 0, 0),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        14,
+                                        14,
+                                        10,
+                                        14,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x18000000),
+                                            blurRadius: 10,
+                                            offset: Offset(0, 4),
                                           ),
-                                          child: const Text(
-                                            'NEW',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                              letterSpacing: 0.5,
+                                        ],
+                                      ),
+
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                const Text(
+                                                  '제품과 관련된 질문은\n저에게 물어보세요!',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    height: 1.36,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFF231E1D),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  '터치해서 바로 대화를 시작해보세요',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.black
+                                                        .withValues(
+                                                          alpha: 0.42,
+                                                        ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        const Text(
-                                          '궁금증을 해결해줄 새로운 해결사',
-                                          style: TextStyle(
-                                            fontSize: 17,
-                                            fontStyle: FontStyle.normal,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color.fromARGB(255, 0, 0, 0),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Container(
-                                          padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(16),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Color(0x18000000),
-                                                blurRadius: 10,
-                                                offset: Offset(0, 4),
-                                              ),
-                                            ],
-                                          ),
-                                          
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text(
-                                                      '제품과 관련된 질문은\n저에게 물어보세요!',
-                                                      style: TextStyle(
-                                                        fontSize: 14,
-                                                        height: 1.36,
-                                                        fontWeight: FontWeight.w800,
-                                                        color: Color(0xFF231E1D),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Text(
-                                                      '터치해서 바로 대화를 시작해보세요',
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        color: Colors.black.withValues(alpha: 0.42),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              SizedBox(
-                                                width: 112,
-                                                height: 112,
-                                                child: Stack(
-                                                  clipBehavior: Clip.none,
-                                                  alignment: Alignment.center,
-                                                  children: [
-                                                    Container(
-                                                      width: 108,
-                                                      height: 108,
-                                                      decoration: const BoxDecoration(
+                                          const SizedBox(width: 8),
+                                          SizedBox(
+                                            width: 112,
+                                            height: 112,
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              alignment: Alignment.center,
+                                              children: [
+                                                Container(
+                                                  width: 108,
+                                                  height: 108,
+                                                  decoration:
+                                                      const BoxDecoration(
                                                         shape: BoxShape.circle,
-                                                        color: Color(0xFFFFE9E7),
+                                                        color: Color(
+                                                          0xFFFFE9E7,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    Positioned(
-                                                      right: -4,
-                                                      bottom: -4,
-                                                      child: Image.asset(
-                                                        _characterAssetForMode(AssistantMode.idle),
-                                                        width: 112,
-                                                        height: 112,
-                                                        fit: BoxFit.contain,
-                                                      ),
-                                                    ),
-                                                  ],
                                                 ),
-                                              ),
-                                            ],
+                                                Positioned(
+                                                  right: -4,
+                                                  bottom: -4,
+                                                  child: Image.asset(
+                                                    _characterAssetForMode(
+                                                      AssistantMode.idle,
+                                                    ),
+                                                    width: 112,
+                                                    height: 112,
+                                                    fit: BoxFit.contain,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                          const Spacer(),
-                          Center(
-                            child: Text(
-                              'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                color: Colors.black.withValues(alpha: 0.34),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          _buildWelcomeComposer(),
-                          const SizedBox(height: 10),
-                        ],
+                        ),
                       ),
-                    ),
+                      const Spacer(),
+                      Center(
+                        child: Text(
+                          'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            color: Colors.black.withValues(alpha: 0.34),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildWelcomeComposer(),
+                      const SizedBox(height: 10),
+                    ],
                   ),
-                  _buildWelcomeNavigation(),
-                ],
+                ),
               ),
-            ),
+              _buildWelcomeNavigation(),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -2080,9 +2079,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         padding: EdgeInsets.zero,
                         onPressed: _isSubmitting
                             ? null
-                            : (showMicAction
-                                  ? _handleMicTap
-                                  : _sendMessage),
+                            : (showMicAction ? _handleMicTap : _sendMessage),
                         icon: _isSubmitting
                             ? const SizedBox.square(
                                 dimension: 16,
@@ -2102,10 +2099,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                     ? (_isRecordingVoice
                                           ? const Color(0xFFCA4156)
                                           : _isRecordingNoise
-                                              ? const Color(0xFFE07A00)
-                                              : Colors.black.withValues(
-                                                  alpha: 0.36,
-                                                ))
+                                          ? const Color(0xFFE07A00)
+                                          : Colors.black.withValues(
+                                              alpha: 0.36,
+                                            ))
                                     : Colors.white,
                               ),
                       ),
@@ -2166,7 +2163,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 const SizedBox(width: 6),
                 Text(
                   _isCheckingConnection ? '확인 중' : _serverStatus,
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -2197,33 +2197,33 @@ class _MobileHomePageState extends State<MobileHomePage> {
           child: Column(
             children: [
               Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        _history.isEmpty ? 12 : 4,
-                        16,
-                        0,
-                      ),
-                      child: Column(
-                        children: [
-                          if (_errorMessage != null) ...[
-                            _buildErrorCard(),
-                            const SizedBox(height: 10),
-                          ],
-                          Expanded(
-                            child: _history.isEmpty
-                                ? _buildChatIntroPanel()
-                                : _buildConversationPanel(),
-                          ),
-                        ],
-                      ),
-                    ),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    _history.isEmpty ? 12 : 4,
+                    16,
+                    0,
                   ),
-                  _buildComposer(),
-                ],
+                  child: Column(
+                    children: [
+                      if (_errorMessage != null) ...[
+                        _buildErrorCard(),
+                        const SizedBox(height: 10),
+                      ],
+                      Expanded(
+                        child: _history.isEmpty
+                            ? _buildChatIntroPanel()
+                            : _buildConversationPanel(),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              _buildComposer(),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -2348,6 +2348,47 @@ class _AttachmentActionTile extends StatelessWidget {
                 const Icon(Icons.chevron_right_rounded),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentQuickAction extends StatelessWidget {
+  const _AttachmentQuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF3F0EE),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 22, color: const Color(0xFF231E1D)),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -2890,6 +2931,3 @@ class ChatTurn {
 
   Map<String, String> toJson() => {'user': user, 'assistant': assistant};
 }
-
-
-

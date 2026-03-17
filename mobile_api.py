@@ -223,11 +223,12 @@ async def chat(
             temp_paths.append(voice_audio_path)
 
         voice_transcript = ""
+        voice_transcription_warning = ""
         if voice_audio_path is not None:
             try:
                 voice_transcript = transcribe_voice_message(voice_audio_path)
             except Exception as error:
-                raise HTTPException(status_code=502, detail=f"음성 전사에 실패했습니다: {error}") from error
+                voice_transcription_warning = f"음성 전사에 실패했습니다: {error}"
 
         effective_message = merge_user_message_text(message, voice_transcript)
         if not effective_message.strip() and image is None and audio is None:
@@ -255,6 +256,7 @@ async def chat(
             "evidence": result.get("evidence", {}),
             "history": updated_history,
             "voice_transcript": voice_transcript,
+            "voice_transcription_warning": voice_transcription_warning,
         }
     except HTTPException:
         raise
