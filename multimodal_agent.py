@@ -582,6 +582,8 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         "Do not use markdown except for the first bold sentence. "
         f"Start the answer with this exact sentence: {opening_line} "
         "In the next sentence, explain the current symptom in this style: '현재 증상은 ... 상황이에요.' "
+        "After that, explain why this symptom may be happening in this style: '이 증상은 보통 ... 때문에 나타날 수 있어요.' "
+        "If the cause is not certain, say '정확한 원인은 확실하지 않지만 ... 때문에 나타날 가능성이 있어요.' "
         "Then write this sentence exactly: '이러한 상황에서는 다음과 같이 대처해보세요.' "
         "After that, provide 2 to 5 numbered steps in order. "
         "Each step should be short, concrete, and easy to follow. "
@@ -596,6 +598,7 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         f"{build_context_block(bundle.retrieved_contexts)}\n\n"
         "Write a concise support response for an end user. "
         "Use plain, everyday Korean and avoid technical jargon when a simpler explanation is possible. "
+        "The answer must clearly include what the current symptom is and why it may be happening. "
         "If the evidence is not enough for a confident diagnosis, say that clearly and ask for only the single most useful next input."
     )
 

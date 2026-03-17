@@ -117,6 +117,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _showWelcomeScreen = true;
   final String _dbUserName = 'ㅇㅇ';
   String _serverStatus = '확인 중';
+  Timer? _recordingUiTimer;
+  DateTime? _recordingStartedAt;
+  Duration _recordingElapsed = Duration.zero;
+  int _recordingWaveSeed = 0;
 
   @override
   void initState() {
@@ -138,6 +142,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       ..dispose();
     _baseUrlController.dispose();
     _scrollController.dispose();
+    _recordingUiTimer?.cancel();
     unawaited(_voiceRecorder.dispose());
     unawaited(_tts.stop());
     super.dispose();
@@ -184,6 +189,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final value = _baseUrlController.text.trim();
     return value.endsWith('/') ? value.substring(0, value.length - 1) : value;
   }
+
+  bool get _isRecordingActive => _isRecordingVoice || _isRecordingNoise;
 
   _ModePresentation get _modePresentation {
     switch (_assistantMode) {
@@ -270,6 +277,39 @@ class _MobileHomePageState extends State<MobileHomePage> {
     try {
       await _tts.stop();
     } catch (_) {}
+  }
+
+  void _startRecordingUiTimer() {
+    _recordingUiTimer?.cancel();
+    _recordingStartedAt = DateTime.now();
+    _recordingElapsed = Duration.zero;
+    _recordingWaveSeed = 0;
+    _recordingUiTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
+      if (!mounted || _recordingStartedAt == null) {
+        return;
+      }
+      setState(() {
+        _recordingWaveSeed += 1;
+        _recordingElapsed = DateTime.now().difference(_recordingStartedAt!);
+      });
+    });
+  }
+
+  void _stopRecordingUiTimer({bool reset = true}) {
+    _recordingUiTimer?.cancel();
+    _recordingUiTimer = null;
+    if (reset) {
+      _recordingStartedAt = null;
+      _recordingElapsed = Duration.zero;
+      _recordingWaveSeed = 0;
+    }
+  }
+
+  String _formatRecordingElapsed() {
+    final totalSeconds = _recordingElapsed.inSeconds;
+    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   Future<void> _speakText(String text) async {
@@ -785,6 +825,49 @@ class _MobileHomePageState extends State<MobileHomePage> {
     return spans;
   }
 
+  String _stripDisplayedImageAttachmentLine(String message) {
+    return message
+        .split('\n')
+        .where((line) => !line.trim().startsWith('[이미지 첨부:'))
+        .join('\n')
+        .trim();
+  }
+
+  List<ChatTurn> _mergeHistoryWithLocalMetadata(
+    List<ChatTurn> nextHistory, {
+    required List<ChatTurn> previousHistory,
+    String? submittedImagePath,
+    String? submittedImageName,
+  }) {
+    final merged = <ChatTurn>[];
+
+    for (var index = 0; index < nextHistory.length; index++) {
+      final nextTurn = nextHistory[index];
+      var imagePath = nextTurn.userImagePath;
+      var imageName = nextTurn.userImageName;
+
+      if (index < previousHistory.length) {
+        final previousTurn = previousHistory[index];
+        if (previousTurn.user == nextTurn.user &&
+            previousTurn.assistant == nextTurn.assistant) {
+          imagePath ??= previousTurn.userImagePath;
+          imageName ??= previousTurn.userImageName;
+        }
+      }
+
+      if (index == nextHistory.length - 1 && submittedImagePath != null) {
+        imagePath = submittedImagePath;
+        imageName = submittedImageName;
+      }
+
+      merged.add(
+        nextTurn.copyWith(userImagePath: imagePath, userImageName: imageName),
+      );
+    }
+
+    return merged;
+  }
+
   Future<void> _sendMessage() async {
     if (_isSubmitting) {
       return;
@@ -818,6 +901,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
     });
 
     try {
+      final previousHistory = List<ChatTurn>.from(_history);
+      final submittedImagePath = _selectedImage?.path;
+      final submittedImageName = _selectedImageName;
+
       final request =
           http.MultipartRequest('POST', Uri.parse('$_baseUrl/api/chat'))
             ..fields['message'] = message
@@ -894,9 +981,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
         }
       }
 
+      final mergedHistory = _mergeHistoryWithLocalMetadata(
+        nextHistory,
+        previousHistory: previousHistory,
+        submittedImagePath: submittedImagePath,
+        submittedImageName: submittedImageName,
+      );
+
       final assistantMessage =
           decoded['assistant_message']?.toString().trim() ??
-          (nextHistory.isNotEmpty ? nextHistory.last.assistant : '');
+          (mergedHistory.isNotEmpty ? mergedHistory.last.assistant : '');
       final shouldSpeak = _autoSpeak && assistantMessage.isNotEmpty;
 
       if (!mounted) {
@@ -904,7 +998,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       }
 
       setState(() {
-        _history = nextHistory;
+        _history = mergedHistory;
         _latestEvidence = const JsonEncoder.withIndent(
           '  ',
         ).convert(decoded['evidence']);
@@ -1527,23 +1621,73 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
     if (_selectedImage != null) {
       chips.add(
-        InputChip(
-          avatar: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              _selectedImage!,
-              width: 28,
-              height: 28,
-              fit: BoxFit.cover,
-            ),
+        SizedBox(
+          width: 72,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F1F1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.black.withValues(alpha: 0.06),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                    ),
+                  ),
+                  Positioned(
+                    top: -4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedImage = null;
+                          _selectedImageName = null;
+                        });
+                      },
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.42),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: 68,
+                child: Text(
+                  _selectedImageName ?? '첨부 이미지',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black.withValues(alpha: 0.55),
+                  ),
+                ),
+              ),
+            ],
           ),
-          label: Text(_selectedImageName ?? '사진'),
-          onDeleted: () {
-            setState(() {
-              _selectedImage = null;
-              _selectedImageName = null;
-            });
-          },
         ),
       );
     }
@@ -1616,9 +1760,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
     return chips;
   }
 
-  Widget _buildBubble(String message, {required bool isUser}) {
+  Widget _buildBubble(
+    String message, {
+    required bool isUser,
+    String? imagePath,
+    String? imageName,
+  }) {
     final bubbleColor = isUser ? const Color(0xFFF06A5D) : Colors.white;
     final foreground = isUser ? Colors.white : const Color(0xFF312726);
+    final displayMessage = isUser && imagePath != null
+        ? _stripDisplayedImageAttachmentLine(message)
+        : message;
     final baseTextStyle = TextStyle(
       color: foreground,
       fontSize: 13,
@@ -1684,13 +1836,62 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ],
               ),
-              child: Text.rich(
-                TextSpan(
-                  children: _buildMessageTextSpans(
-                    message: message,
-                    baseStyle: baseTextStyle,
-                  ),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isUser && imagePath != null) ...[
+                    Container(
+                      width: 74,
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.file(
+                                File(imagePath),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            imageName ?? '첨부 이미지',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9.8,
+                              height: 1.2,
+                              color: Colors.white.withValues(alpha: 0.82),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (displayMessage.isNotEmpty) const SizedBox(height: 10),
+                  ],
+                  if (displayMessage.isNotEmpty)
+                    Text.rich(
+                      TextSpan(
+                        children: _buildMessageTextSpans(
+                          message: displayMessage,
+                          baseStyle: baseTextStyle,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -1998,7 +2199,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         children: [
           for (final turn in _history) ...[
-            _buildBubble(turn.user, isUser: true),
+            _buildBubble(
+              turn.user,
+              isUser: true,
+              imagePath: turn.userImagePath,
+              imageName: turn.userImageName,
+            ),
             const SizedBox(height: 8),
             _buildBubble(turn.assistant, isUser: false),
             const SizedBox(height: 14),
@@ -2968,10 +3174,17 @@ class _MicBadge extends StatelessWidget {
 }
 
 class ChatTurn {
-  const ChatTurn({required this.user, required this.assistant});
+  const ChatTurn({
+    required this.user,
+    required this.assistant,
+    this.userImagePath,
+    this.userImageName,
+  });
 
   final String user;
   final String assistant;
+  final String? userImagePath;
+  final String? userImageName;
 
   factory ChatTurn.fromJson(Map<dynamic, dynamic> json) {
     return ChatTurn(
@@ -2981,4 +3194,18 @@ class ChatTurn {
   }
 
   Map<String, String> toJson() => {'user': user, 'assistant': assistant};
+
+  ChatTurn copyWith({
+    String? user,
+    String? assistant,
+    String? userImagePath,
+    String? userImageName,
+  }) {
+    return ChatTurn(
+      user: user ?? this.user,
+      assistant: assistant ?? this.assistant,
+      userImagePath: userImagePath ?? this.userImagePath,
+      userImageName: userImageName ?? this.userImageName,
+    );
+  }
 }
