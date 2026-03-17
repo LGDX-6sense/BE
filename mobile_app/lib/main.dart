@@ -1093,9 +1093,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                         const Text(
                                           '궁금증을 해결해줄 새로운 해결사',
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 17,
+                                            fontStyle: FontStyle.normal,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF231E1D),
+                                            color: Color.fromARGB(255, 0, 0, 0),
                                           ),
                                         ),
                                         const SizedBox(height: 10),
