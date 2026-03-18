@@ -17,7 +17,7 @@ const _defaultBaseUrlOverride = String.fromEnvironment('DEFAULT_BASE_URL');
 
 void main() => runApp(const LgMobileApp());
 
-enum AssistantMode { idle, audio, photo, replying }
+enum AssistantMode { idle, audio, photo, replying, maincharacter }
 
 enum ServiceRoutingStep { none, askDiagnosis, chooseService }
 
@@ -261,6 +261,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           accent: Color(0xFFD34B5C),
         );
       case AssistantMode.idle:
+      case AssistantMode.maincharacter:
         return _ModePresentation(
           label: 'AI CHAT · Normal Ver',
           title: '안녕하세요 $_displayName님\n어떤 문제 상황인가요?',
@@ -283,6 +284,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return 'assets/characters/photo.png';
       case AssistantMode.replying:
         return 'assets/characters/replying.png';
+      case AssistantMode.maincharacter:
+        return 'assets/characters/rebo_Image.png';
     }
   }
 
@@ -1627,6 +1630,40 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return;
       }
 
+      final restoredHistory = _restoreChatTurnsFromArchiveMessages(messages);
+      if (restoredHistory.isEmpty) {
+        throw const FormatException('이어서 열 수 있는 대화 내용이 없어요.');
+      }
+
+      setState(() {
+        _history = restoredHistory;
+        _chatSessionId = session.id;
+        _showWelcomeScreen = false;
+        _showArchiveScreen = false;
+        _archiveOpenedFromChat = false;
+        _selectedBottomNavIndex = 2;
+        _serviceRoutingStep = ServiceRoutingStep.none;
+        _selectedImage = null;
+        _selectedAudio = null;
+        _recordedVoice = null;
+        _recordedNoise = null;
+        _selectedImageName = null;
+        _selectedAudioName = null;
+        _recordedVoiceName = null;
+        _recordedNoiseName = null;
+        _latestEvidence = null;
+        _errorMessage = null;
+        _messageController.clear();
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
+      return;
+
+      // ignore: dead_code
       await _showSheet(
         session.title,
         ConstrainedBox(
@@ -1678,6 +1715,73 @@ class _MobileHomePageState extends State<MobileHomePage> {
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
+  }
+
+  List<ChatTurn> _restoreChatTurnsFromArchiveMessages(
+    List<ArchiveMessage> messages,
+  ) {
+    final restored = <ChatTurn>[];
+    String? pendingUser;
+    String? pendingImageName;
+
+    String userContentFor(ArchiveMessage message) {
+      final content = message.content.trim();
+      if (content.isNotEmpty) {
+        return message.content;
+      }
+      if (message.attachmentNames.isEmpty) {
+        return '';
+      }
+      final label = switch (message.messageType) {
+        'image' => '이미지 첨부',
+        'audio' => '음성 첨부',
+        _ => '첨부 파일',
+      };
+      return message.attachmentNames
+          .map((name) => '[$label: $name]')
+          .join('\n');
+    }
+
+    void pushPending({String assistant = ''}) {
+      if ((pendingUser == null || pendingUser!.isEmpty) &&
+          pendingImageName == null &&
+          assistant.isEmpty) {
+        return;
+      }
+
+      restored.add(
+        ChatTurn(
+          user: pendingUser ?? '',
+          assistant: assistant,
+          userImageName: pendingImageName,
+        ),
+      );
+      pendingUser = null;
+      pendingImageName = null;
+    }
+
+    for (final message in messages) {
+      if (message.role == 'user') {
+        pushPending();
+        pendingUser = userContentFor(message);
+        pendingImageName =
+            message.messageType == 'image' && message.attachmentNames.isNotEmpty
+            ? message.attachmentNames.first
+            : null;
+        continue;
+      }
+
+      if (message.role == 'assistant') {
+        if (pendingUser == null && pendingImageName == null) {
+          restored.add(ChatTurn(user: '', assistant: message.content));
+        } else {
+          pushPending(assistant: message.content);
+        }
+      }
+    }
+
+    pushPending();
+    return restored;
   }
 
   String _formatArchiveTimestamp(String? value) {
@@ -2104,180 +2208,143 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 20),
-                      Text(
-                        '$_displayName님을 위한 맞춤 안내',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black.withValues(alpha: 0.88),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '생성형 AI를 활용한 스마트 어시스턴트로\n더 나은 자가진단과 손쉬운 대처를 경험해보세요.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.55,
-                          color: Colors.black.withValues(alpha: 0.56),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF6A57),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      InkWell(
-                        onTap: _openChatHome,
-                        borderRadius: BorderRadius.circular(24),
-                        child: Ink(
-                          width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(18, 18, 12, 16),
-                          decoration: BoxDecoration(
+                        child: const Text(
+                          'NEW',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: const Color(0xFFE8D0CB),
-                              width: 1.5,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x26000000),
-                                blurRadius: 20,
-                                offset: Offset(0, 8),
-                              ),
-                            ],
+                            letterSpacing: 0.4,
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color.fromARGB(
-                                          255,
-                                          255,
-                                          133,
-                                          129,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'NEW',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      '궁금증을 해결해줄 새로운 해결사',
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontStyle: FontStyle.normal,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color.fromARGB(255, 0, 0, 0),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Container(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        14,
-                                        14,
-                                        10,
-                                        14,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(16),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Color(0x18000000),
-                                            blurRadius: 10,
-                                            offset: Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                const Text(
-                                                  '제품과 관련된 질문은\n저에게 물어보세요!',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    height: 1.36,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: Color(0xFF231E1D),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  '터치해서 바로 대화를 시작해보세요',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: Colors.black
-                                                        .withValues(
-                                                          alpha: 0.42,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          SizedBox(
-                                            width: 112,
-                                            height: 112,
-                                            child: Stack(
-                                              clipBehavior: Clip.none,
-                                              alignment: Alignment.center,
-                                              children: [
-                                                Container(
-                                                  width: 108,
-                                                  height: 108,
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                        shape: BoxShape.circle,
-                                                        color: Color(
-                                                          0xFFFFE9E7,
-                                                        ),
-                                                      ),
-                                                ),
-                                                Positioned(
-                                                  right: -4,
-                                                  bottom: -4,
-                                                  child: Image.asset(
-                                                    _characterAssetForMode(
-                                                      AssistantMode.idle,
-                                                    ),
-                                                    width: 112,
-                                                    height: 112,
-                                                    fit: BoxFit.contain,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'AS와 문제 진단으로 고통 받았던\n당신만을 위한 새로운 해결사',
+                        style: TextStyle(
+                          fontSize: 18,
+                          height: 1.34,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF231E1D),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _openChatHome,
+                          borderRadius: BorderRadius.circular(38),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(22, 0, 0, 0),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(38),
+                              border: Border.all(
+                                color: const Color(0xFFF0E2DE),
+                                width: 1.2,
                               ),
-                            ],
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x22000000),
+                                  blurRadius: 24,
+                                  offset: Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: SizedBox(
+                              height: 150,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: 5,
+                                        bottom: 10,
+                                        right: 8,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(height: 18),
+                                          const Text(
+                                            '제품과 관련된 질문은\n저에게 물어보세요!',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              height: 1.35,
+                                              fontWeight: FontWeight.w800,
+                                              color: Color(0xFF231E1D),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          FilledButton(
+                                            onPressed: _openChatHome,
+                                            style: FilledButton.styleFrom(
+                                              elevation: 0,
+                                              backgroundColor: const Color(
+                                                0xFFD6D9FF,
+                                              ),
+                                              foregroundColor:
+                                                  const Color.fromARGB(
+                                                    255,
+                                                    89,
+                                                    101,
+                                                    211,
+                                                  ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 13,
+                                                    vertical: 13,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'Chat REBO 사용하기',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 172,
+                                    child: Align(
+                                      alignment: Alignment.bottomRight,
+                                      child: SizedBox(
+                                        width: 172,
+                                        height: 150,
+                                        child: Image.asset(
+                                          _characterAssetForMode(
+                                            AssistantMode.maincharacter,
+                                          ),
+                                          fit: BoxFit.fitHeight,
+                                          alignment: Alignment.bottomRight,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -4095,6 +4162,7 @@ class RobotIllustration extends StatelessWidget {
       AssistantMode.audio => 'assets/characters/audio.png',
       AssistantMode.photo => 'assets/characters/photo.png',
       AssistantMode.replying => 'assets/characters/replying.png',
+      AssistantMode.maincharacter => 'assets/characters/rebo_Image.png',
     };
 
     return Stack(
@@ -4294,6 +4362,7 @@ class _RobotBody extends StatelessWidget {
       AssistantMode.photo => -0.42,
       AssistantMode.replying => -0.1,
       AssistantMode.idle => -0.55,
+      AssistantMode.maincharacter => -0.55,
     };
 
     final rightAngle = switch (mode) {
@@ -4301,6 +4370,7 @@ class _RobotBody extends StatelessWidget {
       AssistantMode.photo => 0.25,
       AssistantMode.replying => 0.62,
       AssistantMode.idle => 0.55,
+      AssistantMode.maincharacter => 0.55,
     };
 
     return SizedBox(
@@ -4437,6 +4507,7 @@ class _RobotFacePainter extends CustomPainter {
 
     switch (mode) {
       case AssistantMode.idle:
+      case AssistantMode.maincharacter:
         canvas.drawRRect(
           RRect.fromRectAndRadius(
             Rect.fromLTWH(size.width * 0.18, size.height * 0.28, 10, 18),

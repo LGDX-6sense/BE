@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import math
 import mimetypes
 import os
 import re
@@ -21,6 +22,10 @@ except ImportError:
 
 DEFAULT_AGENT_MODEL = os.getenv("OPENAI_AGENT_MODEL", os.getenv("OPENAI_MODEL", "gpt-4-mini"))
 DEFAULT_VISION_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4.1-mini")
+DEFAULT_RESPONSE_MODE_EMBEDDING_MODEL = os.getenv(
+    "OPENAI_RESPONSE_MODE_EMBEDDING_MODEL",
+    "text-embedding-3-small",
+)
 DEFAULT_CHUNK_PATH = first_existing_path(
     PROJECT_ROOT / "data" / "lg_solution_chunks.jsonl",
     PROJECT_ROOT / "lg_solution_chunks.jsonl",
@@ -62,6 +67,43 @@ RETRIEVAL_STOPWORDS = {
     "에어컨",
     "소리",
     "나요",
+}
+
+RESPONSE_MODE_EXAMPLES = {
+    "diagnosis": (
+        "냉장고가 시원하지 않아요",
+        "세탁기에서 이상한 소리가 나요",
+        "에어컨이 작동을 안 해요",
+        "에러 코드가 떠요",
+        "전원이 안 켜져요",
+        "물이 안 빠져요",
+        "고장 난 것 같아요",
+        "원인이 뭔가요",
+        "수리를 받아야 하나요",
+        "냄새가 나는 이유가 뭔가요",
+    ),
+    "conversation": (
+        "고마워요",
+        "다시 설명해줘",
+        "쉽게 설명해줘",
+        "요약해줘",
+        "이게 무슨 뜻이야",
+        "무슨 의미야",
+        "정리해줘",
+        "다른 방법도 알려줘",
+        "사용법 알려줘",
+        "기능이 뭐야",
+    ),
+    "diagnosis_followup": (
+        "그럼 어떻게 해야 해요",
+        "왜 그런 거예요",
+        "그래도 안 되면 어떻게 해요",
+        "다음에는 뭘 확인해야 해요",
+        "이 상태면 수리 받아야 해요",
+        "이후에는 뭘 하면 돼요",
+        "계속 이러면 어떡해요",
+        "왜 이렇게 되는 거예요",
+    ),
 }
 
 
@@ -114,6 +156,43 @@ def tokenize(text: str) -> List[str]:
 def normalize_whitespace(text: str) -> str:
     """Collapse repeated whitespace for more stable prompts and search."""
     return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
+    """Compute cosine similarity between two embedding vectors."""
+    if not left or not right or len(left) != len(right):
+        return 0.0
+
+    left_norm = math.sqrt(sum(value * value for value in left))
+    right_norm = math.sqrt(sum(value * value for value in right))
+    if left_norm == 0 or right_norm == 0:
+        return 0.0
+
+    dot_product = sum(left_value * right_value for left_value, right_value in zip(left, right))
+    return dot_product / (left_norm * right_norm)
+
+
+def average_vectors(vectors: Sequence[Sequence[float]]) -> List[float]:
+    """Average a group of embeddings into one centroid vector."""
+    if not vectors:
+        return []
+
+    width = len(vectors[0])
+    if width == 0:
+        return []
+
+    totals = [0.0] * width
+    valid_count = 0
+    for vector in vectors:
+        if len(vector) != width:
+            continue
+        valid_count += 1
+        for index, value in enumerate(vector):
+            totals[index] += float(value)
+
+    if valid_count == 0:
+        return []
+    return [value / valid_count for value in totals]
 
 
 def resolve_openai_model(model_name: str, fallback: str) -> str:
@@ -170,6 +249,33 @@ def ensure_openai() -> None:
         raise ImportError("Missing required package: openai. Install it with `pip install openai`.")
     if not os.getenv("OPENAI_API_KEY"):
         raise EnvironmentError("OPENAI_API_KEY is not set.")
+
+
+@lru_cache(maxsize=1)
+def load_response_mode_centroids(
+    model_name: str = DEFAULT_RESPONSE_MODE_EMBEDDING_MODEL,
+) -> Dict[str, List[float]]:
+    """Embed response-mode example phrases once and cache their centroids."""
+    ensure_openai()
+    client = OpenAI()
+
+    labels: List[str] = []
+    example_texts: List[str] = []
+    for label, samples in RESPONSE_MODE_EXAMPLES.items():
+        for sample in samples:
+            labels.append(label)
+            example_texts.append(sample)
+
+    response = client.embeddings.create(model=model_name, input=example_texts)
+    grouped_vectors: Dict[str, List[List[float]]] = {label: [] for label in RESPONSE_MODE_EXAMPLES}
+    for label, data in zip(labels, response.data):
+        grouped_vectors[label].append(list(data.embedding))
+
+    return {
+        label: average_vectors(vectors)
+        for label, vectors in grouped_vectors.items()
+        if vectors
+    }
 
 
 @lru_cache(maxsize=1)
@@ -563,6 +669,267 @@ def build_agent_request_kwargs(
     return request_kwargs
 
 
+def build_response_instructions(opening_line: str) -> str:
+    """Build conditional response instructions for diagnosis and general chat."""
+    return (
+        "You are an appliance support agent. "
+        "Combine the user's text, recent conversation context, local audio classifier output, image analysis, and LG support context. "
+        "Write the final answer in very easy Korean for a non-technical user. "
+        "Only say things that are supported by the evidence. "
+        "If something is uncertain, do not present it as fact. "
+        "Instead say clearly that it is hard to be certain and describe it as a possibility. "
+        "Do not use English section headings. "
+        "Do not use markdown except when you are explicitly told to start with one bold sentence. "
+        "The input includes recent conversation history and the latest user message. "
+        "First decide whether the latest user message is mainly about appliance diagnosis, symptoms, troubleshooting, error codes, noise, repair, or a fault-related follow-up. "
+        "If it is diagnosis-related, use this structure. "
+        f"Start with this exact sentence: {opening_line} "
+        "In the next sentence, explain the current symptom in this style: '현재 증상은 ... 상황이에요.' "
+        "After that, explain why this symptom may be happening in this style: '이 증상은 보통 ... 문제 때문에 생길 수 있어요.' "
+        "If the cause is not certain, say '정확한 원인은 확실하지 않지만 ... 문제일 가능성도 있어요.' "
+        "Then write this sentence exactly: '이러한 상황에서는 다음과 같이 대처해보세요.' "
+        "After that, provide 2 to 5 numbered steps in order. "
+        "Each step should be short, concrete, and easy to follow. "
+        "If service is recommended, mention it in the last numbered step or a short final sentence. "
+        "If the latest user message is not diagnosis-related, do not use the diagnosis template and do not start with the diagnosis sentence. "
+        "Instead answer naturally as a continuing conversation in easy Korean. "
+        "In that case, answer the user's actual question first, keep the wording connected to the recent conversation, and only mention diagnosis or symptoms if they are directly relevant. "
+        "For non-diagnosis questions, use a natural conversational reply in 2 to 5 short sentences, and ask at most one short follow-up question only when it is really needed. "
+        "Do not mention ThinQ app, this app, or '앱을 통해' style wording unless the user explicitly asks about the app itself. "
+        "If warnings indicate a missing modality result, briefly mention that limitation in simple Korean."
+    )
+
+
+def build_response_user_prompt(evidence_json: str, context_block: str) -> str:
+    """Build the user prompt for either diagnosis or general follow-up replies."""
+    return (
+        "Multimodal evidence:\n"
+        f"{evidence_json}\n\n"
+        "Relevant LG support context:\n"
+        f"{context_block}\n\n"
+        "Write a concise support response for an end user. "
+        "Use plain, everyday Korean and avoid technical jargon when a simpler explanation is possible. "
+        "If the latest user message is diagnosis-related, clearly include what the current symptom is and why it may be happening. "
+        "If the latest user message is not diagnosis-related, answer it naturally so the conversation flows correctly from the recent turns. "
+        "If the evidence is not enough for a confident diagnosis, say that clearly and ask for only the single most useful next input."
+    )
+
+
+def extract_latest_user_message(conversation_text: str) -> str:
+    """Extract the latest user message from the compact conversation context."""
+    lines = [line.strip() for line in str(conversation_text or "").splitlines() if line.strip()]
+    for line in reversed(lines):
+        if line.startswith("Current user message:"):
+            return normalize_whitespace(line.split(":", 1)[1])
+        if line.startswith("User:"):
+            return normalize_whitespace(line.split(":", 1)[1])
+    return normalize_whitespace(conversation_text)
+
+
+def classify_response_mode(bundle: AgentEvidenceBundle) -> str:
+    """Choose between diagnosis mode and general conversation mode."""
+    latest_message = normalize_whitespace(extract_latest_user_message(bundle.user_text)).lower()
+    conversation_text = normalize_whitespace(bundle.user_text).lower()
+    has_prior_diagnosis_context = (
+        "현재 증상은" in conversation_text
+        or "진단해봤어요" in conversation_text
+    )
+
+    if bundle.audio or bundle.image:
+        return "diagnosis"
+
+    diagnosis_keywords = (
+        "증상",
+        "에러",
+        "오류",
+        "코드",
+        "소리",
+        "소음",
+        "고장",
+        "수리",
+        "원인",
+        "진단",
+        "진동",
+        "냄새",
+        "누수",
+        "작동",
+        "멈춤",
+        "고쳐",
+        "고쳐줘",
+        "차갑지",
+        "안 시원",
+        "시원하지",
+        "배수",
+        "결빙",
+        "팬",
+        "전원",
+        "문이 안",
+        "물이 안",
+        "안돼",
+        "안되",
+        "안 돼",
+    )
+    general_chat_keywords = (
+        "고마워",
+        "감사",
+        "안녕",
+        "반가워",
+        "이름",
+        "누구",
+        "뭐 할 수",
+        "무슨 기능",
+        "사용법",
+        "설명해",
+        "다시 말해",
+        "쉽게 말해",
+        "정리해",
+        "요약해",
+        "요약해줘",
+        "번역해",
+        "추천해",
+        "비교해",
+        "무슨 뜻",
+        "이게 무슨 뜻",
+        "뜻이야",
+        "다시 설명",
+        "다시 설명해줘",
+        "쉽게 설명",
+    )
+    followup_keywords = (
+        "그럼",
+        "그러면",
+        "왜",
+        "왜 그래",
+        "왜 그런",
+        "어떻게",
+        "어떡해",
+        "그 다음",
+        "다음엔",
+        "해결",
+        "조치",
+        "확인",
+        "맞아",
+        "계속",
+        "그래도",
+    )
+
+    keyword_scores = {
+        "diagnosis": 0.0,
+        "conversation": 0.0,
+        "diagnosis_followup": 0.0,
+    }
+    for keyword in diagnosis_keywords:
+        if keyword in latest_message:
+            keyword_scores["diagnosis"] += 0.12 if " " in keyword else 0.08
+    for keyword in general_chat_keywords:
+        if keyword in latest_message:
+            keyword_scores["conversation"] += 0.12 if " " in keyword else 0.08
+    for keyword in followup_keywords:
+        if keyword in latest_message:
+            keyword_scores["diagnosis_followup"] += 0.12 if " " in keyword else 0.08
+
+    if keyword_scores["diagnosis"] >= 0.16:
+        return "diagnosis"
+    if has_prior_diagnosis_context and keyword_scores["diagnosis_followup"] >= 0.08:
+        return "diagnosis"
+    if keyword_scores["conversation"] >= 0.16:
+        return "conversation"
+
+    vector_scores = {
+        "diagnosis": 0.0,
+        "conversation": 0.0,
+        "diagnosis_followup": 0.0,
+    }
+    try:
+        centroids = load_response_mode_centroids()
+        response = OpenAI().embeddings.create(
+            model=DEFAULT_RESPONSE_MODE_EMBEDDING_MODEL,
+            input=[latest_message],
+        )
+        input_vector = list(response.data[0].embedding)
+        for label, centroid in centroids.items():
+            vector_scores[label] = cosine_similarity(input_vector, centroid)
+    except Exception:
+        vector_scores = vector_scores
+
+    diagnosis_score = keyword_scores["diagnosis"] + vector_scores["diagnosis"]
+    conversation_score = keyword_scores["conversation"] + vector_scores["conversation"]
+    followup_score = keyword_scores["diagnosis_followup"] + vector_scores["diagnosis_followup"]
+
+    if has_prior_diagnosis_context and followup_score >= 0.34:
+        return "diagnosis"
+    if diagnosis_score >= 0.34 and diagnosis_score > conversation_score + 0.02:
+        return "diagnosis"
+    if has_prior_diagnosis_context and diagnosis_score >= 0.28 and followup_score >= 0.28:
+        return "diagnosis"
+    if conversation_score >= 0.30:
+        return "conversation"
+
+    return "conversation"
+
+
+def build_mode_specific_instructions(mode: str, opening_line: str) -> str:
+    """Build a prompt that matches the detected response mode."""
+    common_prefix = (
+        "You are an appliance support agent. "
+        "Combine the user's text, recent conversation context, local audio classifier output, image analysis, and LG support context. "
+        "Write the final answer in very easy Korean for a non-technical user. "
+        "Only say things that are supported by the evidence. "
+        "If something is uncertain, do not present it as fact. "
+        "Instead say clearly that it is hard to be certain and describe it as a possibility. "
+        "Do not use English section headings. "
+        "Do not mention ThinQ app, this app, or '앱을 통해' style wording unless the user explicitly asks about the app itself. "
+        "If warnings indicate a missing modality result, briefly mention that limitation in simple Korean. "
+    )
+    if mode == "diagnosis":
+        return (
+            common_prefix
+            + "Do not use markdown except for the first bold sentence. "
+            + f"Start the answer with this exact sentence: {opening_line} "
+            + "In the next sentence, explain the current symptom in this style: '현재 증상은 ... 상황이에요.' "
+            + "After that, explain why this symptom may be happening in this style: '이 증상은 보통 ... 문제 때문에 생길 수 있어요.' "
+            + "If the cause is not certain, say '정확한 원인은 확실하지 않지만 ... 문제일 가능성도 있어요.' "
+            + "Then write this sentence exactly: '이러한 상황에서는 다음과 같이 대처해보세요.' "
+            + "After that, provide 2 to 5 numbered steps in order. "
+            + "Each step should be short, concrete, and easy to follow. "
+            + "If service is recommended, mention it in the last numbered step or a short final sentence."
+        )
+    return (
+        common_prefix
+        + "Do not use markdown. "
+        + "The latest user message is not a direct symptom diagnosis request. "
+        + "Answer naturally as a continuing conversation in easy Korean. "
+        + "Answer the user's actual question first. "
+        + "Keep the wording connected to the recent conversation so the flow feels natural. "
+        + "Only mention diagnosis or symptoms if they are directly relevant to the latest question. "
+        + "Never use these diagnosis-template phrases in conversation mode: '진단해봤어요', '현재 증상은', '이러한 상황에서는 다음과 같이 대처해보세요.' "
+        + "Use 2 to 5 short sentences. "
+        + "Ask at most one short follow-up question only when it is really needed."
+    )
+
+
+def build_mode_specific_user_prompt(
+    mode: str,
+    evidence_json: str,
+    context_block: str,
+    latest_user_message: str,
+) -> str:
+    """Build a prompt payload tailored to the detected mode."""
+    return (
+        f"Detected response mode: {mode}\n"
+        f"Latest user message: {latest_user_message}\n\n"
+        "Multimodal evidence:\n"
+        f"{evidence_json}\n\n"
+        "Relevant LG support context:\n"
+        f"{context_block}\n\n"
+        "Write a concise support response for an end user. "
+        "Use plain, everyday Korean and avoid technical jargon when a simpler explanation is possible. "
+        "If this is diagnosis mode, clearly include what the current symptom is and why it may be happening. "
+        "If this is conversation mode, answer the latest user message naturally so the conversation flows correctly from the recent turns. "
+        "If the evidence is not enough for a confident diagnosis, say that clearly and ask for only the single most useful next input."
+    )
+
+
 def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
     """Generate the final multimodal support response."""
     ensure_openai()
@@ -601,6 +968,17 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         "Use plain, everyday Korean and avoid technical jargon when a simpler explanation is possible. "
         "The answer must clearly include what the current symptom is and why it may be happening. "
         "If the evidence is not enough for a confident diagnosis, say that clearly and ask for only the single most useful next input."
+    )
+
+    latest_user_message = extract_latest_user_message(bundle.user_text)
+    response_mode = classify_response_mode(bundle)
+    context_block = build_context_block(bundle.retrieved_contexts)
+    instructions = build_mode_specific_instructions(response_mode, opening_line)
+    user_prompt = build_mode_specific_user_prompt(
+        response_mode,
+        evidence_json,
+        context_block,
+        latest_user_message,
     )
 
     primary_model = resolve_openai_model(DEFAULT_AGENT_MODEL, "gpt-5-mini")
