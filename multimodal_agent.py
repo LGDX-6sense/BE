@@ -775,25 +775,36 @@ def classify_response_mode(bundle: AgentEvidenceBundle) -> str:
         "안되",
         "안 돼",
     )
-    # Expressions that clearly signal the issue is resolved or the user is closing the conversation.
-    # These must be checked BEFORE followup_keywords to avoid "해결됐어" being misrouted.
+    # Expressions that clearly signal the issue is resolved or the user is closing/thanking.
+    # These must be checked BEFORE followup_keywords to avoid misrouting (e.g. "해결됐어" → "해결").
     resolution_keywords = (
+        # 감사/인사
+        "고마워",
+        "고마워요",
+        "감사해",
+        "감사해요",
+        "감사합니다",
+        "감사드려요",
+        "수고해",
+        "수고하세요",
+        "수고했어",
+        # 해결 완료
         "해결됐어",
         "해결됐어요",
         "해결됐습니다",
+        "해결했어",
+        "해결했어요",
         "고쳐졌어",
         "고쳐졌어요",
         "됐어요",
         "됐습니다",
-        "해결했어",
-        "해결했어요",
         "문제없어",
         "문제없어요",
         "괜찮아졌어",
         "괜찮아졌어요",
     )
     general_chat_keywords = (
-        "고마워",
+        "고마워",'고마',
         "고마워요",
         "감사",
         "안녕",
@@ -856,11 +867,11 @@ def classify_response_mode(bundle: AgentEvidenceBundle) -> str:
     if any(kw in latest_message for kw in resolution_keywords):
         return "conversation"
 
-    if keyword_scores["diagnosis"] >= 0.16:
+    if keyword_scores["diagnosis"] >= 0.20:
         return "diagnosis"
     if has_prior_diagnosis_context and keyword_scores["diagnosis_followup"] >= 0.08:
         return "diagnosis"
-    if keyword_scores["conversation"] >= 0.16:
+    if keyword_scores["conversation"] >= 0.20:
         return "conversation"
 
     vector_scores = {
