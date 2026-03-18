@@ -2808,14 +2808,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildChatScreen() {
-    return Scaffold(
-      extendBodyBehindAppBar: true,
+    return Scaffold( 
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        //backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
         automaticallyImplyLeading: false,
         titleSpacing: 16,
         title: const Text(
@@ -2857,7 +2855,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    (_history.isEmpty ? 12 : 4) + kToolbarHeight,
+                    _history.isEmpty ? 12 : 4,
                     16,
                     0,
                   ),
