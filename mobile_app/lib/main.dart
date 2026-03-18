@@ -19,6 +19,8 @@ void main() => runApp(const LgMobileApp());
 
 enum AssistantMode { idle, audio, photo, replying }
 
+enum ServiceRoutingStep { none, askDiagnosis, chooseService }
+
 class LgMobileApp extends StatelessWidget {
   const LgMobileApp({super.key});
 
@@ -89,6 +91,34 @@ class _MobileHomePageState extends State<MobileHomePage> {
     'aac',
     'flac',
   };
+  static const List<String> _serviceActionKeywords = [
+    '상담',
+    '상담사',
+    '고객센터',
+    '전화',
+    '통화',
+    '콜센터',
+    '출장',
+    '방문',
+    '기사',
+    '예약',
+    '접수',
+    '상담 예약',
+    '접수',
+    '서비스',
+    '서비스센터',
+    '서비스 센터',
+    '상담 예약',
+    '서비스 예약',
+    ' 상담 접수',
+    '예약',
+    '예약하기',
+    '예약 해줘',
+    '예약해줘',
+    '예약 부탁',
+    '예약 부탁해',
+    '서비스 예약',
+  ];
 
   final _messageController = TextEditingController();
   final _baseUrlController = TextEditingController();
@@ -115,8 +145,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _isRecordingNoise = false;
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
-  final String _dbUserName = 'ㅇㅇ';
+  final String _dbUserName = '지영';
   String _serverStatus = '확인 중';
+  ServiceRoutingStep _serviceRoutingStep = ServiceRoutingStep.none;
   Timer? _recordingUiTimer;
   DateTime? _recordingStartedAt;
   Duration _recordingElapsed = Duration.zero;
@@ -222,14 +253,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
           accent: Color(0xFFD34B5C),
         );
       case AssistantMode.idle:
-        return const _ModePresentation(
+        return _ModePresentation(
           label: 'AI CHAT · Normal Ver',
-          title: '안녕하세요 고객님\n어떤 문제 상황인가요?',
+          title: '안녕하세요 $_displayName님\n어떤 문제 상황인가요?',
           description:
               '텍스트를 입력하거나 + 버튼으로 사진과 파일을, 마이크 버튼으로 STT 또는 소음 녹음을 선택할 수 있어요.',
           hintText: '텍스트를 입력해주세요',
-          gradientColors: [Color(0xFFFFF7F3), Color(0xFFFFDCD6)],
-          accent: Color(0xFFE9524A),
+          gradientColors: const [Color(0xFFFFF7F3), Color(0xFFFFDCD6)],
+          accent: const Color(0xFFE9524A),
         );
     }
   }
@@ -864,6 +895,109 @@ class _MobileHomePageState extends State<MobileHomePage> {
     return spans;
   }
 
+  bool _containsServiceActionIntent(String text) {
+    final normalized = text.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    return _serviceActionKeywords.any(normalized.contains);
+  }
+
+  String _buildLocalUserDisplayMessage({
+    required String message,
+    String? imageName,
+    String? audioName,
+    String? voiceName,
+    String? noiseName,
+  }) {
+    final parts = <String>[];
+    if (message.trim().isNotEmpty) {
+      parts.add(message.trim());
+    }
+    if (imageName != null && imageName.trim().isNotEmpty) {
+      parts.add('[이미지 첨부: ${imageName.trim()}]');
+    }
+    if (audioName != null && audioName.trim().isNotEmpty) {
+      parts.add('[오디오 첨부: ${audioName.trim()}]');
+    }
+    if (voiceName != null && voiceName.trim().isNotEmpty) {
+      parts.add('[음성 메시지: ${voiceName.trim()}]');
+    }
+    if (noiseName != null && noiseName.trim().isNotEmpty) {
+      parts.add('[오디오 첨부: ${noiseName.trim()}]');
+    }
+    return parts.isEmpty ? '[입력 없음]' : parts.join('\n');
+  }
+
+  void _appendLocalUserTurnAndPromptServiceRouting({
+    required String userMessage,
+    String? imagePath,
+    String? imageName,
+  }) {
+    setState(() {
+      _history = [
+        ..._history,
+        ChatTurn(
+          user: userMessage,
+          assistant: '',
+          userImagePath: imagePath,
+          userImageName: imageName,
+        ),
+      ];
+      _serviceRoutingStep = ServiceRoutingStep.askDiagnosis;
+      _selectedImage = null;
+      _selectedAudio = null;
+      _recordedVoice = null;
+      _recordedNoise = null;
+      _selectedImageName = null;
+      _selectedAudioName = null;
+      _recordedVoiceName = null;
+      _recordedNoiseName = null;
+      _messageController.clear();
+      _errorMessage = null;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  void _startAiDiagnosisFromRouting() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _serviceRoutingStep = ServiceRoutingStep.none;
+      _history = const [];
+      _selectedImage = null;
+      _selectedAudio = null;
+      _recordedVoice = null;
+      _recordedNoise = null;
+      _selectedImageName = null;
+      _selectedAudioName = null;
+      _recordedVoiceName = null;
+      _recordedNoiseName = null;
+      _latestEvidence = null;
+      _errorMessage = null;
+      _messageController.clear();
+    });
+  }
+
+  void _handleServiceActionSelection(String actionLabel) {
+    setState(() {
+      _serviceRoutingStep = ServiceRoutingStep.none;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$actionLabel 선택 화면으로 이어질 수 있도록 준비했어요.')),
+    );
+  }
+
   String _stripDisplayedImageAttachmentLine(String message) {
     return message
         .split('\n')
@@ -937,6 +1071,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
+      _serviceRoutingStep = ServiceRoutingStep.none;
     });
 
     try {
@@ -1026,6 +1161,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
         submittedImagePath: submittedImagePath,
         submittedImageName: submittedImageName,
       );
+      final routingRequired = decoded['routing_required'] == true;
+      final routingIntent = decoded['routing_intent']?.toString();
+      final nextRoutingStep = !routingRequired
+          ? ServiceRoutingStep.none
+          : (routingIntent == 'connect_agent' || routingIntent == 'book_visit')
+          ? ServiceRoutingStep.chooseService
+          : ServiceRoutingStep.askDiagnosis;
 
       final assistantMessage =
           decoded['assistant_message']?.toString().trim() ??
@@ -1038,9 +1180,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _history = mergedHistory;
-        _latestEvidence = const JsonEncoder.withIndent(
-          '  ',
-        ).convert(decoded['evidence']);
+        _serviceRoutingStep = nextRoutingStep;
+        _latestEvidence = routingRequired
+            ? null
+            : const JsonEncoder.withIndent('  ').convert(decoded['evidence']);
         _selectedImage = null;
         _selectedAudio = null;
         _recordedVoice = null;
@@ -1099,6 +1242,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
     setState(() {
       _history = const [];
+      _serviceRoutingStep = ServiceRoutingStep.none;
       _selectedImage = null;
       _selectedAudio = null;
       _recordedVoice = null;
@@ -1118,6 +1262,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     setState(() {
       _showWelcomeScreen = false;
       _history = const [];
+      _serviceRoutingStep = ServiceRoutingStep.none;
       _selectedImage = null;
       _selectedAudio = null;
       _recordedVoice = null;
@@ -2218,15 +2363,22 @@ class _MobileHomePageState extends State<MobileHomePage> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         children: [
-          for (final turn in _history) ...[
+          for (var index = 0; index < _history.length; index++) ...[
             _buildBubble(
-              turn.user,
+              _history[index].user,
               isUser: true,
-              imagePath: turn.userImagePath,
-              imageName: turn.userImageName,
+              imagePath: _history[index].userImagePath,
+              imageName: _history[index].userImageName,
             ),
-            const SizedBox(height: 8),
-            _buildBubble(turn.assistant, isUser: false),
+            if (_history[index].assistant.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildBubble(_history[index].assistant, isUser: false),
+            ],
+            if (index == _history.length - 1 &&
+                _serviceRoutingStep != ServiceRoutingStep.none) ...[
+              const SizedBox(height: 10),
+              _buildServiceRoutingPanel(),
+            ],
             const SizedBox(height: 14),
           ],
           if (_isSubmitting)
@@ -2257,6 +2409,140 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceRoutingPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7F3),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF2DDD7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_serviceRoutingStep == ServiceRoutingStep.askDiagnosis) ...[
+            const Text(
+              'AI 진단을 먼저 해보시겠어요?',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '증상을 먼저 확인하면 더 알맞은 다음 도움을 드릴 수 있어요.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: Colors.black.withValues(alpha: 0.54),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '바로 연결을 원하시면 아래에서 선택하고, 먼저 상태를 확인하고 싶으면 AI 진단을 시작해보세요.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: Colors.black.withValues(alpha: 0.54),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : _startAiDiagnosisFromRouting,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: const Color(0xFFFFECE8),
+                      foregroundColor: const Color(0xFF9C3F36),
+                    ),
+                    child: const Text('예'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => setState(
+                            () => _serviceRoutingStep =
+                                ServiceRoutingStep.chooseService,
+                          ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      foregroundColor: Colors.black.withValues(alpha: 0.7),
+                      side: BorderSide(
+                        color: Colors.black.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: const Text('아니오'),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            const Text(
+              '필요한 도움을 선택해보세요.',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => _handleServiceActionSelection('상담사 연결'),
+                    icon: const Icon(Icons.support_agent_rounded, size: 18),
+                    label: const Text('상담사 연결'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: const Color(0xFFFFECE8),
+                      foregroundColor: const Color(0xFF9C3F36),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => _handleServiceActionSelection('출장서비스 예약'),
+                    icon: const Icon(
+                      Icons.home_repair_service_rounded,
+                      size: 18,
+                    ),
+                    label: const Text('출장서비스 예약'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: const Color(0xFFFFF3E8),
+                      foregroundColor: const Color(0xFF9B5A20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _isSubmitting ? null : _startAiDiagnosisFromRouting,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF9C3F36),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
+                ),
+                child: const Text('먼저 AI 진단해보기'),
+              ),
+            ),
+          ],
         ],
       ),
     );

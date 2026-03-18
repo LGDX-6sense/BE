@@ -588,6 +588,7 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
         "After that, provide 2 to 5 numbered steps in order. "
         "Each step should be short, concrete, and easy to follow. "
         "If service is recommended, mention it in the last numbered step or a short final sentence. "
+        "Do not mention ThinQ app, this app, or '앱을 통해' style wording unless the user explicitly asks about the app itself. "
         "If warnings indicate a missing modality result, briefly mention that limitation in simple Korean."
     )
 
