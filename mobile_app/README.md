@@ -1,68 +1,78 @@
 # ChatThinQ Flutter 앱
 
-`mobile_app/`는 LG 가전 멀티모달 에이전트를 위한 Flutter 클라이언트입니다. Android와 iOS에서 실행할 수 있으며, 텍스트, 사진, 파일, STT, 소음 녹음 흐름을 한 화면에서 다룰 수 있습니다.
+`mobile_app/`는 LG 가전 멀티모달 진단용 Flutter 클라이언트입니다.  
+Android와 iPhone에서 실행할 수 있고, 텍스트, 사진, 음성 녹음, 파일 첨부를 지원합니다.
 
 ## 준비
-
-패키지를 설치합니다.
 
 ```bash
 flutter pub get
 ```
 
-## 실행 방법
+## iPhone에서 실행
 
-안드로이드 에뮬레이터:
+사전 준비:
+
+- Mac에 Xcode 설치
+- Mac에 CocoaPods 설치
+- iPhone을 Mac에 연결
+- iPhone과 백엔드 PC를 같은 Wi-Fi에 연결
+- Apple 개발자 서명 설정
+
+백엔드 주소:
+
+- 현재 Windows PC 주소 예시: `http://192.168.0.13:8000`
+- 주소가 바뀌면 `ipconfig`로 다시 확인
+
+직접 실행:
+
+```bash
+cd mobile_app
+flutter pub get
+cd ios
+pod install
+cd ..
+flutter run --dart-define=DEFAULT_BASE_URL=http://192.168.0.13:8000
+```
+
+스크립트 실행:
+
+```bash
+cd mobile_app
+chmod +x run_ios_device.sh
+./run_ios_device.sh
+```
+
+백엔드 주소를 바꿔서 실행:
+
+```bash
+./run_ios_device.sh http://192.168.0.13:8000
+```
+
+특정 iPhone 기기를 지정해서 실행:
+
+```bash
+flutter devices
+./run_ios_device.sh http://192.168.0.13:8000 <device_id>
+```
+
+## Android에서 실행
+
+에뮬레이터:
 
 ```bash
 flutter run -d android --dart-define=DEFAULT_BASE_URL=http://10.0.2.2:8000
 ```
 
-iOS 시뮬레이터:
-
-```bash
-flutter run -d ios --dart-define=DEFAULT_BASE_URL=http://127.0.0.1:8000
-```
-
 실기기:
 
-- 같은 Wi-Fi 환경이면 PC의 LAN IP를 사용합니다.
-- 예시: `http://192.168.0.20:8000`
+- 같은 Wi-Fi 환경이면 PC LAN IP 사용
+- USB 연결 + `adb reverse` 환경이면 `http://127.0.0.1:8000` 사용 가능
 
-## 안드로이드 실기기 Hot Reload
+## Hot Reload
 
-USB로 연결된 안드로이드 기기에서 `adb reverse`까지 자동으로 처리하며 실행하려면 아래 스크립트를 사용합니다.
-
-```powershell
-.\run_hot_reload.ps1
-```
-
-옵션을 직접 지정할 수도 있습니다.
-
-```powershell
-.\run_hot_reload.ps1 -DeviceId R3CN205RZTY -BaseUrl http://127.0.0.1:8000
-```
-
-실행 중 사용할 수 있는 키:
+`flutter run` 실행 중에는:
 
 - `r`: Hot Reload
 - `R`: Hot Restart
 - `q`: 종료
-
-## 현재 지원하는 기능
-
-- 텍스트 입력
-- 카메라 촬영
-- 갤러리 사진 선택
-- 파일 기반 오디오 업로드
-- 마이크 버튼으로 `말하기(STT)` 또는 `소음 녹음` 선택
-- 채팅 히스토리 확인
-- 분석 근거(Evidence) 팝업 확인
-- 앱 내부에서 백엔드 주소 설정
-
-## 개발 팁
-
-- Android 에뮬레이터는 보통 `http://10.0.2.2:8000`을 사용합니다.
-- iOS 시뮬레이터는 보통 `http://127.0.0.1:8000`을 사용합니다.
-- 안드로이드 실기기를 USB로 연결한 경우 `adb reverse`를 쓰면 `http://127.0.0.1:8000`으로 개발할 수 있습니다.
-- 분석 전에 `flutter analyze lib/main.dart`로 기본 정적 검사를 돌려두면 편합니다.

@@ -2809,70 +2809,37 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildChatScreen() {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFFBF7),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Container(
-          margin: const EdgeInsets.only(left: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: IconButton(
-            padding: EdgeInsets.zero,
-            onPressed: () => setState(() => _showWelcomeScreen = true),
-            icon: const Icon(Icons.chevron_left_rounded, size: 20),
-          ),
-        ),
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        titleSpacing: 16,
         title: const Text(
-          'ChatThinQ',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+          'Chat REBO',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF8F8A86),
+            letterSpacing: -0.2,
+          ),
         ),
         actions: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: _serverHealthy
-                        ? const Color(0xFF25B069)
-                        : const Color(0xFFE4664B),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _isCheckingConnection ? '확인 중' : _serverStatus,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: '연결 설정',
-            onPressed: _openSettings,
-            icon: const Icon(Icons.tune_rounded, size: 20),
-          ),
-          IconButton(
+          _TopBarIconButton(
             tooltip: '대화 초기화',
             onPressed: _resetConversation,
-            icon: const Icon(Icons.refresh_rounded, size: 20),
+            child: const _TrashOutlineIcon(),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 2),
+          _TopBarIconButton(
+            tooltip: '채팅 닫기',
+            onPressed: () => setState(() => _showWelcomeScreen = true),
+            child: const _CloseOutlineIcon(),
+          ),
+          const SizedBox(width: 10),
         ],
       ),
       body: Container(
@@ -2890,7 +2857,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    _history.isEmpty ? 12 : 4,
+                    (_history.isEmpty ? 12 : 4) + kToolbarHeight,
                     16,
                     0,
                   ),
@@ -3680,6 +3647,129 @@ class _RecordingWaveform extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TopBarIconButton extends StatelessWidget {
+  const _TopBarIconButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.child,
+  });
+
+  final String tooltip;
+  final VoidCallback onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      splashRadius: 17,
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 9),
+      icon: child,
+    );
+  }
+}
+
+class _CloseOutlineIcon extends StatelessWidget {
+  const _CloseOutlineIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/icon/chat_close.png',
+      width: 17,
+      height: 17,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return SizedBox(
+          width: 17,
+          height: 17,
+          child: CustomPaint(painter: _CloseOutlinePainter()),
+        );
+      },
+    );
+  }
+}
+
+class _TrashOutlineIcon extends StatelessWidget {
+  const _TrashOutlineIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/icon/chat_arhive.png',
+      width: 17,
+      height: 17,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return SizedBox(
+          width: 17,
+          height: 17,
+          child: CustomPaint(painter: _TrashOutlinePainter()),
+        );
+      },
+    );
+  }
+}
+
+class _CloseOutlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF23201E)
+      ..strokeWidth = 2.3
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(
+      Offset(size.width * 0.21, size.height * 0.21),
+      Offset(size.width * 0.79, size.height * 0.79),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.79, size.height * 0.21),
+      Offset(size.width * 0.21, size.height * 0.79),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TrashOutlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = const Color(0xFF23201E)
+      ..strokeWidth = 1.7
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final lidPath = Path()
+      ..moveTo(size.width * 0.20, size.height * 0.29)
+      ..lineTo(size.width * 0.80, size.height * 0.29)
+      ..moveTo(size.width * 0.40, size.height * 0.18)
+      ..lineTo(size.width * 0.60, size.height * 0.18);
+    canvas.drawPath(lidPath, stroke);
+
+    final binRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.23,
+        size.height * 0.33,
+        size.width * 0.54,
+        size.height * 0.41,
+      ),
+      const Radius.circular(2.4),
+    );
+    canvas.drawRRect(binRect, stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class ChatTurn {
