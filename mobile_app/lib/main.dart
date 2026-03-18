@@ -381,7 +381,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           title: '안녕하세요 $_displayName님\n어떤 문제 상황인가요?',
           description:
               '텍스트를 입력하거나 + 버튼으로 사진과 파일을, 마이크 버튼으로 STT 또는 소음 녹음을 선택할 수 있어요.',
-          hintText: '텍스트를 입력해주세요',
+          hintText: '메시지를 입력하세요',
           gradientColors: const [Color(0xFFFFF7F3), Color(0xFFFFDCD6)],
           accent: const Color(0xFFE9524A),
         );
@@ -822,68 +822,125 @@ class _MobileHomePageState extends State<MobileHomePage> {
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      useSafeArea: true,
+      barrierColor: const Color(0x33212121),
+      useSafeArea: false,
+      isScrollControlled: true,
       builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBF8),
-              borderRadius: BorderRadius.circular(32),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x22000000),
-                  blurRadius: 28,
-                  offset: Offset(0, 18),
-                ),
-              ],
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(28, 32, 28, 54),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x0D212121),
+                blurRadius: 4,
+                offset: Offset(0, -4),
+              ),
+            ],
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '마이크 모드 선택',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '녹음방법',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF212121),
+                  height: 1.11,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '말하기로 텍스트를 입력하거나, 제품 소리를 녹음해 분석받을 수 있어요.',
-                  style: TextStyle(
-                    color: Colors.black.withValues(alpha: 0.58),
-                    height: 1.45,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '어떤 내용을 녹음할지 선택해주세요.',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF5D5B5B),
+                  height: 1.14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Future<void>.delayed(
+                          const Duration(milliseconds: 120),
+                          _startVoiceRecording,
+                        );
+                      },
+                      child: Container(
+                        height: 79,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F7F7),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.mic_rounded, size: 24, color: Color(0xFF5D5B5B)),
+                            SizedBox(height: 4),
+                            Text(
+                              '음성채팅',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF5D5B5B),
+                                height: 1.125,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                _AttachmentActionTile(
-                  icon: Icons.mic_rounded,
-                  title: '말하기 (STT)',
-                  subtitle: '말한 내용을 텍스트로 변환해 전송합니다.',
-                  color: const Color(0xFFFFECE8),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    Future<void>.delayed(
-                      const Duration(milliseconds: 120),
-                      _startVoiceRecording,
-                    );
-                  },
-                ),
-                _AttachmentActionTile(
-                  icon: Icons.graphic_eq_rounded,
-                  title: '소음 녹음',
-                  subtitle: '제품에서 나는 소리를 녹음해 AI가 분석합니다.',
-                  color: const Color(0xFFFFF3E0),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    Future<void>.delayed(
-                      const Duration(milliseconds: 120),
-                      _startNoiseRecording,
-                    );
-                  },
-                ),
-              ],
-            ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        Future<void>.delayed(
+                          const Duration(milliseconds: 120),
+                          _startNoiseRecording,
+                        );
+                      },
+                      child: Container(
+                        height: 79,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F7F7),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.graphic_eq_rounded, size: 24, color: Color(0xFF5D5B5B)),
+                            SizedBox(height: 4),
+                            Text(
+                              '소음/진동',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF5D5B5B),
+                                height: 1.125,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -2837,14 +2894,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-              Image.asset(
-                'assets/characters/audio.png',
-                width: 202,
-                height: 202,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
@@ -2894,9 +2944,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
               isIdle
                   ? '안녕하세요, $_displayName님!\n고장·AS 전용 상담사 REBO 에요.\n어떤 문제가 궁금하신가요?'
                   : _modePresentation.title,
-              style: const TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 14,
+              style: TextStyle(
+                color: isIdle ? const Color(0xFF212121) : const Color(0xFFFF937E),
+                fontSize: isIdle ? 14 : 18,
                 fontWeight: FontWeight.w600,
                 height: 1.44,
               ),
@@ -3120,49 +3170,102 @@ class _MobileHomePageState extends State<MobileHomePage> {
       );
     }
 
-    if (_selectedAudioName != null) {
-      chips.add(
-        InputChip(
-          avatar: const Icon(Icons.audio_file_rounded, size: 18),
-          label: Text(_selectedAudioName!),
-          onDeleted: () {
-            setState(() {
-              _selectedAudio = null;
-              _selectedAudioName = null;
-            });
-          },
+    Widget buildAudioCard({
+      required String name,
+      required IconData icon,
+      required VoidCallback onDelete,
+    }) {
+      return SizedBox(
+        width: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7F7F7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Icon(icon, size: 16, color: const Color(0xFF999999)),
+                          const Icon(Icons.open_in_full_rounded, size: 14, color: Color(0xFF222222)),
+                        ],
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 2),
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF5D5B5B),
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: GestureDetector(
+                    onTap: onDelete,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       );
+    }
+
+    if (_selectedAudioName != null) {
+      chips.add(buildAudioCard(
+        name: _selectedAudioName!,
+        icon: Icons.audio_file_rounded,
+        onDelete: () => setState(() { _selectedAudio = null; _selectedAudioName = null; }),
+      ));
     }
 
     if (_recordedVoiceName != null) {
-      chips.add(
-        InputChip(
-          avatar: const Icon(Icons.mic_rounded, size: 18),
-          label: Text(_recordedVoiceName!),
-          onDeleted: () {
-            setState(() {
-              _recordedVoice = null;
-              _recordedVoiceName = null;
-            });
-          },
-        ),
-      );
+      chips.add(buildAudioCard(
+        name: _recordedVoiceName!,
+        icon: Icons.mic_rounded,
+        onDelete: () => setState(() { _recordedVoice = null; _recordedVoiceName = null; }),
+      ));
     }
 
     if (_recordedNoiseName != null) {
-      chips.add(
-        InputChip(
-          avatar: const Icon(Icons.graphic_eq_rounded, size: 18),
-          label: Text(_recordedNoiseName!),
-          onDeleted: () {
-            setState(() {
-              _recordedNoise = null;
-              _recordedNoiseName = null;
-            });
-          },
-        ),
-      );
+      chips.add(buildAudioCard(
+        name: _recordedNoiseName!,
+        icon: Icons.graphic_eq_rounded,
+        onDelete: () => setState(() { _recordedNoise = null; _recordedNoiseName = null; }),
+      ));
     }
 
     return chips;
@@ -3802,6 +3905,45 @@ class _MobileHomePageState extends State<MobileHomePage> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         children: [
+          // 새 채팅 유도 배너
+          GestureDetector(
+            onTap: _resetConversation,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF937E).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFFF937E).withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.add_comment_outlined, size: 16, color: Color(0xFFFF937E)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '다른 증상을 진단하려면 새 채팅을 시작하세요',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFFF937E),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    '새 채팅 →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFFF937E),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           for (var index = 0; index < _history.length; index++) ...[
             _buildBubble(
               _history[index].user,
@@ -4165,15 +4307,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                           decoration: BoxDecoration(
                             color: showMicAction
                                 ? const Color(0xFFFFF4F0)
-                                : null,
-                            gradient: showMicAction
-                                ? null
-                                : const LinearGradient(
-                                    colors: [
-                                      Color(0xFFE9524A),
-                                      Color(0xFFCA4156),
-                                    ],
-                                  ),
+                                : const Color(0xFFFF937E),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: SizedBox(
@@ -4197,7 +4331,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                   : Icon(
                                       showMicAction
                                           ? Icons.mic_none_rounded
-                                          : Icons.arrow_upward_rounded,
+                                          : Icons.send_rounded,
                                       size: 18,
                                       color: showMicAction
                                           ? Colors.black.withValues(alpha: 0.36)
@@ -4314,20 +4448,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
             iconColor: Colors.black.withValues(alpha: 0.62),
             onPressed: _cancelActiveRecording,
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: const BoxDecoration(
-              color: Color(0xFFF3F1EF),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.send_rounded,
-              size: 18,
-              color: Colors.black.withValues(alpha: 0.16),
-            ),
-          ),
         ],
       ),
     );
@@ -4352,16 +4472,30 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
         ),
         actions: [
+          if (_history.isNotEmpty)
+            GestureDetector(
+              onTap: _resetConversation,
+              child: Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF937E).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text(
+                  '새 채팅',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFFF937E),
+                  ),
+                ),
+              ),
+            ),
           _TopBarIconButton(
             tooltip: '보관함',
             onPressed: _openArchiveScreen,
             child: const _ArchiveOutlineIcon(),
-          ),
-          const SizedBox(width: 2),
-          _TopBarIconButton(
-            tooltip: '대화 초기화',
-            onPressed: _resetConversation,
-            child: const _TrashOutlineIcon(),
           ),
           const SizedBox(width: 2),
           _TopBarIconButton(
@@ -4393,7 +4527,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       const SizedBox(height: 10),
                     ],
                     Expanded(
-                      child: _history.isEmpty
+                      child: (_isRecordingActive || _history.isEmpty)
                           ? _buildChatIntroPanel()
                           : _buildConversationPanel(),
                     ),
