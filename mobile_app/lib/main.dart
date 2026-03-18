@@ -13,6 +13,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import 'screens/home_screen.dart';
+import 'screens/device_screen.dart';
+import 'screens/care_screen.dart';
+import 'screens/menu_screen.dart';
+
 const _defaultBaseUrlOverride = String.fromEnvironment('DEFAULT_BASE_URL');
 
 void main() => runApp(const LgMobileApp());
@@ -20,6 +25,107 @@ void main() => runApp(const LgMobileApp());
 enum AssistantMode { idle, audio, photo, replying, maincharacter }
 
 enum ServiceRoutingStep { none, askDiagnosis, chooseService }
+
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
+
+  @override
+  State<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends State<MainShell> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final screens = <Widget>[
+      HomeScreen(onOpenChatbot: () => setState(() => _currentIndex = 2)),
+      const DeviceScreen(),
+      const MobileHomePage(hideBottomNav: true),
+      const CareScreen(),
+      const MenuScreen(),
+    ];
+
+    return Scaffold(
+      body: IndexedStack(index: _currentIndex, children: screens),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    const activeColor = Color(0xFF212121);
+    final inactiveColor = const Color(0xFF212121).withValues(alpha: 0.30);
+
+    final items = <({IconData? icon, String? assetPath, String label})>[
+      (icon: Icons.home_filled, assetPath: null, label: '홈'),
+      (icon: null, assetPath: 'assets/icon/Widget_add.png', label: '디바이스'),
+      (icon: null, assetPath: 'assets/icon/Chat_search.png', label: '챗봇'),
+      (icon: null, assetPath: 'assets/icon/Line_up.png', label: '케어'),
+      (icon: null, assetPath: 'assets/icon/Chart.png', label: '메뉴'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        border: Border(
+          top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            for (int i = 0; i < items.length; i++)
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _currentIndex = i),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        items[i].assetPath != null
+                            ? Opacity(
+                                opacity: _currentIndex == i ? 1.0 : 0.30,
+                                child: Image.asset(
+                                  items[i].assetPath!,
+                                  width: 18,
+                                  height: 18,
+                                ),
+                              )
+                            : Icon(
+                                items[i].icon,
+                                size: 18,
+                                color: _currentIndex == i
+                                    ? activeColor
+                                    : inactiveColor,
+                              ),
+                        const SizedBox(height: 4),
+                        Text(
+                          items[i].label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: _currentIndex == i
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                            color: _currentIndex == i
+                                ? activeColor
+                                : inactiveColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class LgMobileApp extends StatelessWidget {
   const LgMobileApp({super.key});
@@ -70,13 +176,20 @@ class LgMobileApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MobileHomePage(),
+      home: const MainShell(),
     );
   }
 }
 
 class MobileHomePage extends StatefulWidget {
-  const MobileHomePage({super.key});
+  const MobileHomePage({
+    super.key,
+    this.startInChatMode = false,
+    this.hideBottomNav = false,
+  });
+
+  final bool startInChatMode;
+  final bool hideBottomNav;
 
   @override
   State<MobileHomePage> createState() => _MobileHomePageState();
@@ -164,6 +277,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   @override
   void initState() {
     super.initState();
+    _showWelcomeScreen = !widget.startInChatMode;
     _messageController.addListener(_handleComposerChanged);
     _baseUrlController.text = _defaultBaseUrlOverride.isNotEmpty
         ? _defaultBaseUrlOverride
@@ -256,7 +370,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           label: 'AI CHAT · Thinking Ver',
           title: '답변을 작성중이에요.\n조금만 기다려주세요.',
           description: '텍스트, 사진, 소리 정보를 합쳐서 진단 내용을 정리하고 있어요.',
-          hintText: '답변 작성 중입니다',
+          hintText: '응답 생성 중 ···',
           gradientColors: [Color(0xFFFFF4F2), Color(0xFFFFD7DB)],
           accent: Color(0xFFD34B5C),
         );
@@ -1997,7 +2111,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ),
               ),
-              _buildPrimaryNavigation(),
+              if (!widget.hideBottomNav) _buildPrimaryNavigation(),
             ],
           ),
         ),
@@ -2366,7 +2480,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ),
               ),
-              _buildPrimaryNavigation(),
+              if (!widget.hideBottomNav) _buildPrimaryNavigation(),
             ],
           ),
         ),
@@ -2523,6 +2637,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildPrimaryNavigation() {
+    if (widget.hideBottomNav) return const SizedBox.shrink();
     final items =
         <
           ({
@@ -2649,51 +2764,172 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildChatIntroPanel() {
-    final presentation = _modePresentation;
-    final showDescription = _assistantMode != AssistantMode.idle;
+    final isIdle = _assistantMode == AssistantMode.idle;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 26, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: 172,
-              height: 172,
-              child: RobotIllustration(mode: _assistantMode),
-            ),
-          ),
-          const SizedBox(height: 22),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Text(
-              presentation.title,
-              style: const TextStyle(
-                fontSize: 17.5,
-                height: 1.35,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1F1B1A),
+    if (_isSubmitting) {
+      return SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 32, 12, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDFDFDF),
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    _characterAssetForMode(AssistantMode.audio),
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-            ),
-          ),
-          if (showDescription) ...[
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Text(
-                presentation.description,
+              const SizedBox(height: 16),
+              const Text(
+                '해결방법을 생각 중이에요',
                 style: TextStyle(
-                  fontSize: 11.5,
-                  height: 1.55,
-                  color: Colors.black.withValues(alpha: 0.52),
+                  color: Color(0xFFFF937E),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  height: 1.33,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF937E).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF7469).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF5555).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 오디오 녹음 중 화면
+    if (_isRecordingActive) {
+      return SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 32, 12, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 165,
+                height: 165,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDFDFDF),
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    _characterAssetForMode(AssistantMode.audio),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Image.asset(
+                'assets/characters/audio.png',
+                width: 202,
+                height: 202,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 32),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    '소리를 듣고 있어요.\n정확한 진단을 위해\n주변 소음을 차단해주세요.',
+                    style: TextStyle(
+                      color: Color(0xFFFF937E),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      height: 1.44,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 32, 12, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDFDFDF),
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    _characterAssetForMode(_assistantMode),
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            Text(
+              isIdle
+                  ? '안녕하세요, $_displayName님!\n고장·AS 전용 상담사 REBO 에요.\n어떤 문제가 궁금하신가요?'
+                  : _modePresentation.title,
+              style: const TextStyle(
+                color: Color(0xFF212121),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.44,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.fromLTRB(10, 6, 14, 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.70),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(
+                  color: const Color(0xFFFF937E),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.photo_camera_outlined, size: 13, color: Color(0xFFEB4C4C)),
+                  SizedBox(width: 5),
+                  Text(
+                    '사진/음성으로 더 정확한 진단이 가능해요',
+                    style: TextStyle(
+                      color: Color(0xFFEB4C4C),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
-          const Spacer(),
-        ],
+        ),
       ),
     );
   }
@@ -2938,8 +3174,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
     String? imagePath,
     String? imageName,
   }) {
-    final bubbleColor = isUser ? const Color(0xFFF06A5D) : Colors.white;
-    final foreground = isUser ? Colors.white : const Color(0xFF312726);
+    final bubbleColor = isUser
+        ? Colors.white.withValues(alpha: 0.70)
+        : Colors.white;
+    final foreground = isUser ? const Color(0xFF5D5B5B) : const Color(0xFF312726);
     final displayMessage = isUser && imagePath != null
         ? _stripDisplayedImageAttachmentLine(message)
         : message;
@@ -2991,15 +3229,24 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isUser ? 12 : 14,
+                vertical: isUser ? 10 : 12,
+              ),
               decoration: BoxDecoration(
                 color: bubbleColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(22),
-                  topRight: const Radius.circular(22),
-                  bottomLeft: Radius.circular(isUser ? 22 : 8),
-                  bottomRight: Radius.circular(isUser ? 8 : 22),
-                ),
+                borderRadius: isUser
+                    ? const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        topRight: Radius.circular(10),
+                        bottomLeft: Radius.circular(10),
+                      )
+                    : const BorderRadius.only(
+                        topLeft: Radius.circular(22),
+                        topRight: Radius.circular(22),
+                        bottomRight: Radius.circular(22),
+                        bottomLeft: Radius.circular(8),
+                      ),
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x12000000),
@@ -3360,13 +3607,198 @@ class _MobileHomePageState extends State<MobileHomePage> {
     );
   }
 
-  Widget _buildConversationPanel() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(24),
+  static const _asCategories = [
+    '양문형 냉장고',
+    '일반형 냉장고',
+    '상냉장 / 하냉동',
+    '정수기형 냉장고',
+    '스탠드형 김치냉장고',
+    '뚜껑형 김치냉장고',
+    '와인셀러',
+  ];
+
+  bool _isAfterCategoryOrSerial(String userMsg) {
+    if (userMsg.startsWith('시리얼 넘버:')) return true;
+    return _asCategories.any((cat) => userMsg.trim() == cat);
+  }
+
+  Widget _buildSuggestionChip(String label, {required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.70),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFEB4C4C),
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            height: 1.43,
+          ),
+        ),
       ),
-      child: ListView(
+    );
+  }
+
+  void _showCategorySheet() {
+    const categories = [
+      '양문형 냉장고',
+      '일반형 냉장고',
+      '상냉장 / 하냉동',
+      '정수기형 냉장고',
+      '스탠드형 김치냉장고',
+      '뚜껑형 김치냉장고',
+      '와인셀러',
+    ];
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF8),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '세부 카테고리 선택',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '수현님의 냉장고를 선택해주세요.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF5D5B5B)),
+                ),
+                const SizedBox(height: 16),
+                ...categories.map(
+                  (cat) => InkWell(
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _messageController.text = cat;
+                      _sendMessage();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cat,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF212121)),
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFFF937E)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSerialNumberSheet() {
+    final controller = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(14, 24, 14, bottomInset + 14),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF8),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '시리얼 넘버(S/N) 입력',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '제품 뒷면 또는 측면 스티커에서 확인할 수 있어요.',
+                  style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.52)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'S/N 번호를 입력하세요',
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFFF937E)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.12)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFFF937E), width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      final sn = controller.text.trim();
+                      if (sn.isNotEmpty) {
+                        Navigator.of(sheetContext).pop();
+                        _messageController.text = '시리얼 넘버: $sn';
+                        _sendMessage();
+                      }
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF937E),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('입력 완료', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildConversationPanel() {
+    return ListView(
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
         children: [
@@ -3379,7 +3811,63 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             if (_history[index].assistant.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  _characterAssetForMode(AssistantMode.idle),
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 12),
               _buildBubble(_history[index].assistant, isUser: false),
+              // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
+              if (index == _history.length - 1 &&
+                  !_isSubmitting &&
+                  _serviceRoutingStep == ServiceRoutingStep.none &&
+                  _history[index].userImagePath == null) ...[
+                const SizedBox(height: 12),
+                if (_isAfterCategoryOrSerial(_history[index].user)) ...[
+                  // AS 안내 텍스트
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBF8),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Text(
+                      'AS 신청이 필요하시군요!\n아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF5D5B5B), height: 1.5),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildSuggestionChip('상담사 연결', onTap: () {
+                        _messageController.text = '상담사 연결해줘';
+                        _sendMessage();
+                      }),
+                      _buildSuggestionChip('A/S 신청', onTap: () {
+                        _messageController.text = 'A/S 신청하고 싶어요';
+                        _sendMessage();
+                      }),
+                    ],
+                  ),
+                ] else ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildSuggestionChip('세부 카테고리 선택', onTap: _showCategorySheet),
+                      _buildSuggestionChip('시리얼 넘버(S/N) 찾기', onTap: _showSerialNumberSheet),
+                    ],
+                  ),
+                ],
+              ],
             ],
             if (index == _history.length - 1 &&
                 _serviceRoutingStep != ServiceRoutingStep.none) ...[
@@ -3389,35 +3877,66 @@ class _MobileHomePageState extends State<MobileHomePage> {
             const SizedBox(height: 14),
           ],
           if (_isSubmitting)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Builder(builder: (context) {
+                final hasImage = _history.isNotEmpty && _history.last.userImagePath != null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox.square(
-                      dimension: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDFDFDF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          _characterAssetForMode(AssistantMode.audio),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
-                    SizedBox(width: 10),
+                    if (hasImage) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          File(_history.last.userImagePath!),
+                          width: 98,
+                          height: 98,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
                     Text(
-                      '답변을 작성중이에요...',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                      hasImage
+                          ? '사진을 분석중이에요\n정확한 진단을 위해 조금만 기다려주세요'
+                          : '해결방법을 생각 중이에요\n정확한 진단을 위해 조금만 기다려주세요',
+                      style: const TextStyle(
+                        color: Color(0xFFFF937E),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        height: 1.33,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF937E).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        const SizedBox(width: 5),
+                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF7469).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        const SizedBox(width: 5),
+                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF5555).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                      ],
                     ),
                   ],
-                ),
-              ),
+                );
+              }),
             ),
         ],
-      ),
     );
   }
 
@@ -3816,20 +4335,20 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildChatScreen() {
     return Scaffold(
+      backgroundColor: const Color(0xFFFCEDEB),
       appBar: AppBar(
-        //backgroundColor: Colors.transparent,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        titleSpacing: 16,
+        titleSpacing: 19,
         title: const Text(
           'Chat REBO',
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF8F8A86),
-            letterSpacing: -0.2,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF212121),
           ),
         ),
         actions: [
@@ -3856,43 +4375,61 @@ class _MobileHomePageState extends State<MobileHomePage> {
           const SizedBox(width: 10),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFFBF7), Color(0xFFFFF1EB), Color(0xFFFFECE6)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    _history.isEmpty ? 12 : 4,
-                    16,
-                    0,
-                  ),
-                  child: Column(
-                    children: [
-                      if (_errorMessage != null) ...[
-                        _buildErrorCard(),
-                        const SizedBox(height: 10),
-                      ],
-                      Expanded(
-                        child: _history.isEmpty
-                            ? _buildChatIntroPanel()
-                            : _buildConversationPanel(),
-                      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  _history.isEmpty ? 12 : 4,
+                  16,
+                  0,
+                ),
+                child: Column(
+                  children: [
+                    if (_errorMessage != null) ...[
+                      _buildErrorCard(),
+                      const SizedBox(height: 10),
                     ],
-                  ),
+                    Expanded(
+                      child: _history.isEmpty
+                          ? _buildChatIntroPanel()
+                          : _buildConversationPanel(),
+                    ),
+                  ],
                 ),
               ),
-              _buildComposer(),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text(
+                    'AI가 생성한 응답은 부정확할 수 있습니다.',
+                    style: TextStyle(
+                      color: Color(0xFF5D5B5B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Text(
+                    '더보기',
+                    style: TextStyle(
+                      color: Color(0xFF5D5B5B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w400,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            _buildComposer(),
+          ],
         ),
       ),
     );
