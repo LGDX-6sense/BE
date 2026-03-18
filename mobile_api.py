@@ -9,9 +9,18 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from chat_archive_store import (
+    ChatSession,
+    list_messages,
+    list_sessions,
+    save_chat_exchange,
+    serialize_message,
+    serialize_session,
+)
+from db import get_database_status, get_session_factory
 from multimodal_agent import (
     DEFAULT_CHUNK_PATH,
     DEFAULT_FULL_DOC_PATH,
@@ -406,6 +415,7 @@ def health() -> Dict[str, Any]:
         "full_doc_path": str(full_doc_path),
         "full_doc_available": full_doc_path.exists(),
         "openai_api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
+        "database": get_database_status(),
     }
 
 
@@ -413,6 +423,9 @@ def health() -> Dict[str, Any]:
 async def chat(
     message: str = Form(""),
     user_name: str = Form(""),
+    user_id: int = Form(1),
+    product_id: Optional[int] = Form(None),
+    session_id: Optional[int] = Form(None),
     history_json: str = Form("[]"),
     top_k: int = Form(DEFAULT_TOP_K),
     image: Optional[UploadFile] = File(default=None),
@@ -466,10 +479,37 @@ async def chat(
         intent_result = classify_service_intent(effective_message)
         if intent_result["routing_required"]:
             updated_history = history + [{"user": user_message, "assistant": ""}]
+            saved_session_id = session_id
+            archive_warning = ""
+            try:
+                db = get_session_factory()()
+                try:
+                    saved_session = save_chat_exchange(
+                        db,
+                        session_id=session_id,
+                        user_id=user_id,
+                        product_id=product_id,
+                        user_message=user_message,
+                        assistant_message="",
+                        history=updated_history,
+                        routing_intent=intent_result["intent"],
+                        routing_required=True,
+                        image_filename=image.filename if image else None,
+                        audio_filename=audio.filename if audio else None,
+                        voice_filename=voice_audio.filename if voice_audio else None,
+                    )
+                    saved_session_id = saved_session.id
+                finally:
+                    db.close()
+            except Exception as error:
+                archive_warning = str(error)
+
             return {
                 "assistant_message": "",
                 "evidence": {},
                 "history": updated_history,
+                "session_id": saved_session_id,
+                "archive_warning": archive_warning,
                 "voice_transcript": voice_transcript,
                 "voice_transcription_warning": voice_transcription_warning,
                 "routing_required": True,
@@ -488,11 +528,38 @@ async def chat(
             user_name=user_name,
         )
         updated_history = history + [{"user": user_message, "assistant": result["response"]}]
+        saved_session_id = session_id
+        archive_warning = ""
+        try:
+            db = get_session_factory()()
+            try:
+                saved_session = save_chat_exchange(
+                    db,
+                    session_id=session_id,
+                    user_id=user_id,
+                    product_id=product_id,
+                    user_message=user_message,
+                    assistant_message=result["response"],
+                    history=updated_history,
+                    routing_intent="normal_chat",
+                    routing_required=False,
+                    image_filename=image.filename if image else None,
+                    audio_filename=audio.filename if audio else None,
+                    voice_filename=voice_audio.filename if voice_audio else None,
+                    ai_meta={"user_name": user_name} if user_name.strip() else None,
+                )
+                saved_session_id = saved_session.id
+            finally:
+                db.close()
+        except Exception as error:
+            archive_warning = str(error)
 
         return {
             "assistant_message": result["response"],
             "evidence": result.get("evidence", {}),
             "history": updated_history,
+            "session_id": saved_session_id,
+            "archive_warning": archive_warning,
             "voice_transcript": voice_transcript,
             "voice_transcription_warning": voice_transcription_warning,
             "routing_required": False,
@@ -507,6 +574,45 @@ async def chat(
         raise HTTPException(status_code=500, detail=str(error)) from error
     finally:
         cleanup_temp_files(temp_paths)
+
+
+@app.get("/api/archive/sessions")
+def archive_sessions(
+    user_id: int = Query(1),
+    limit: int = Query(50, ge=1, le=200),
+) -> Dict[str, Any]:
+    """Return archive cards for one user."""
+    try:
+        db = get_session_factory()()
+        try:
+            sessions = list_sessions(db, user_id=user_id, limit=limit)
+            return {"sessions": [serialize_session(session) for session in sessions]}
+        finally:
+            db.close()
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/archive/sessions/{session_id}")
+def archive_session_detail(session_id: int) -> Dict[str, Any]:
+    """Return one archive session with its messages."""
+    try:
+        db = get_session_factory()()
+        try:
+            session = db.get(ChatSession, session_id)
+            if session is None:
+                raise HTTPException(status_code=404, detail="Archive session not found.")
+            messages = list_messages(db, session_id=session_id)
+            return {
+                "session": serialize_session(session),
+                "messages": [serialize_message(message) for message in messages],
+            }
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
 
 def main() -> None:

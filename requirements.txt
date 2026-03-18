@@ -7,3 +7,6 @@ gradio
 fastapi
 uvicorn[standard]
 python-multipart
+sqlalchemy
+pymysql
+cryptography

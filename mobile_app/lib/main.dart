@@ -138,6 +138,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   String? _recordedNoiseName;
   String? _latestEvidence;
   String? _errorMessage;
+  int? _chatSessionId;
   bool _isSubmitting = false;
   bool _isCheckingConnection = false;
   bool _serverHealthy = false;
@@ -145,6 +146,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _isRecordingNoise = false;
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
+  final int _dbUserId = 1;
   final String _dbUserName = '지영';
   String _serverStatus = '확인 중';
   ServiceRoutingStep _serviceRoutingStep = ServiceRoutingStep.none;
@@ -974,6 +976,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     setState(() {
       _serviceRoutingStep = ServiceRoutingStep.none;
       _history = const [];
+      _chatSessionId = null;
       _selectedImage = null;
       _selectedAudio = null;
       _recordedVoice = null;
@@ -1083,9 +1086,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
           http.MultipartRequest('POST', Uri.parse('$_baseUrl/api/chat'))
             ..fields['message'] = message
             ..fields['user_name'] = _displayName
+            ..fields['user_id'] = _dbUserId.toString()
             ..fields['history_json'] = jsonEncode(
               _history.map((turn) => turn.toJson()).toList(),
             );
+
+      if (_chatSessionId != null) {
+        request.fields['session_id'] = _chatSessionId.toString();
+      }
 
       if (_selectedImage != null) {
         request.files.add(
@@ -1180,6 +1188,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _history = mergedHistory;
+        _chatSessionId = decoded['session_id'] is num
+            ? (decoded['session_id'] as num).toInt()
+            : _chatSessionId;
         _serviceRoutingStep = nextRoutingStep;
         _latestEvidence = routingRequired
             ? null
@@ -1242,6 +1253,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
     setState(() {
       _history = const [];
+      _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
       _selectedImage = null;
       _selectedAudio = null;
@@ -1262,6 +1274,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     setState(() {
       _showWelcomeScreen = false;
       _history = const [];
+      _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
       _selectedImage = null;
       _selectedAudio = null;
@@ -2808,7 +2821,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildChatScreen() {
-    return Scaffold( 
+    return Scaffold(
       appBar: AppBar(
         //backgroundColor: Colors.transparent,
         elevation: 0,
