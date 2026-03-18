@@ -146,9 +146,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _isRecordingNoise = false;
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
+  bool _showArchiveScreen = false;
+  bool _archiveOpenedFromChat = false;
+  bool _isLoadingArchive = false;
+  int _selectedBottomNavIndex = 0;
   final int _dbUserId = 1;
   final String _dbUserName = '지영';
   String _serverStatus = '확인 중';
+  String? _archiveErrorMessage;
+  List<ArchiveSessionSummary> _archiveSessions = const [];
   ServiceRoutingStep _serviceRoutingStep = ServiceRoutingStep.none;
   Timer? _recordingUiTimer;
   DateTime? _recordingStartedAt;
@@ -1273,6 +1279,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _showWelcomeScreen = false;
+      _showArchiveScreen = false;
+      _archiveOpenedFromChat = false;
+      _selectedBottomNavIndex = 2;
       _history = const [];
       _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
@@ -1288,6 +1297,762 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _errorMessage = null;
       _messageController.clear();
     });
+  }
+
+  void _closeArchiveScreen() {
+    setState(() {
+      _showArchiveScreen = false;
+      _showWelcomeScreen = !_archiveOpenedFromChat;
+      _archiveOpenedFromChat = false;
+    });
+  }
+
+  Future<void> _openArchiveScreen() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await _stopSpeaking();
+    if (!mounted) {
+      return;
+    }
+
+    final openedFromChat = !_showWelcomeScreen && !_showArchiveScreen;
+
+    setState(() {
+      _showWelcomeScreen = false;
+      _showArchiveScreen = true;
+      _archiveOpenedFromChat = openedFromChat;
+      _archiveErrorMessage = null;
+    });
+
+    await _loadArchiveSessions();
+
+    if (!mounted || _showArchiveScreen) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(sheetContext).size.height * 0.78,
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBF8),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'chat_archive',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                Text(
+                  '저장된 대화 목록을 확인해보세요.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Colors.black.withValues(alpha: 0.56),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (_archiveErrorMessage != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1ED),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFFFD8CC)),
+                    ),
+                    child: Text(
+                      _archiveErrorMessage!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.45,
+                        color: Color(0xFF8A4C42),
+                      ),
+                    ),
+                  )
+                else if (_archiveSessions.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      '저장된 대화가 아직 없어요.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: _archiveSessions.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final session = _archiveSessions[index];
+                        return Material(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          child: InkWell(
+                            onTap: () async {
+                              Navigator.of(sheetContext).pop();
+                              await Future<void>.delayed(
+                                const Duration(milliseconds: 120),
+                              );
+                              await _showArchiveSessionDetail(session);
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                14,
+                                14,
+                                14,
+                                12,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 9,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFEEE9),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _archiveStatusLabel(session.status),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFFE9524A),
+                                          ),
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        _formatArchiveTimestamp(
+                                          session.lastMessageAt,
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.black.withValues(
+                                            alpha: 0.42,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    session.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    session.summary,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      height: 1.45,
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loadArchiveSessions() async {
+    if (_isLoadingArchive) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingArchive = true;
+      _archiveErrorMessage = null;
+    });
+
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+              '$_baseUrl/api/archive/sessions?user_id=$_dbUserId&limit=50',
+            ),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      final body = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          body is Map<String, dynamic>
+              ? body['detail']?.toString() ?? response.body
+              : response.body,
+        );
+      }
+
+      if (body is! Map<String, dynamic>) {
+        throw const FormatException('보관함 응답 형식이 올바르지 않습니다.');
+      }
+
+      final items = <ArchiveSessionSummary>[];
+      final rawSessions = body['sessions'];
+      if (rawSessions is List) {
+        for (final item in rawSessions) {
+          if (item is Map) {
+            items.add(ArchiveSessionSummary.fromJson(item));
+          }
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _archiveSessions = items;
+        _serverHealthy = true;
+        _serverStatus = '연결됨';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _archiveErrorMessage = error.toString();
+        _serverHealthy = false;
+        _serverStatus = '요청 실패';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingArchive = false);
+      }
+    }
+  }
+
+  Future<void> _showArchiveSessionDetail(ArchiveSessionSummary session) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_baseUrl/api/archive/sessions/${session.id}'))
+          .timeout(const Duration(seconds: 20));
+
+      final body = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          body is Map<String, dynamic>
+              ? body['detail']?.toString() ?? response.body
+              : response.body,
+        );
+      }
+
+      if (body is! Map<String, dynamic>) {
+        throw const FormatException('보관함 상세 응답 형식이 올바르지 않습니다.');
+      }
+
+      final messages = <ArchiveMessage>[];
+      final rawMessages = body['messages'];
+      if (rawMessages is List) {
+        for (final item in rawMessages) {
+          if (item is Map) {
+            messages.add(ArchiveMessage.fromJson(item));
+          }
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      await _showSheet(
+        session.title,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: messages.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final message = messages[index];
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message.role == 'assistant' ? 'AI 답변' : '사용자',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      message.content,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  String _formatArchiveTimestamp(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '';
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value;
+    }
+    final local = parsed.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$month.$day $hour:$minute';
+  }
+
+  String _archiveStatusLabel(String status) {
+    switch (status) {
+      case 'resolved':
+        return '해결됨';
+      case 'archived':
+        return '보관됨';
+      default:
+        return '진행중';
+    }
+  }
+
+  Widget _buildArchiveScreen() {
+    final hasSessions = _archiveSessions.isNotEmpty;
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFFFBF8),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          tooltip: '홈으로',
+          onPressed: _closeArchiveScreen,
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'chat_archive',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              '저장된 대화 목록',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black.withValues(alpha: 0.48),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: '새 대화',
+            onPressed: _openChatHome,
+            icon: const Icon(Icons.add_comment_outlined),
+          ),
+          IconButton(
+            tooltip: '새로고침',
+            onPressed: _loadArchiveSessions,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFFBF8), Color(0xFFFFF3EE), Color(0xFFFFECE6)],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: RefreshIndicator(
+                  color: const Color(0xFFE9524A),
+                  onRefresh: _loadArchiveSessions,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x14000000),
+                              blurRadius: 18,
+                              offset: Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEEE9),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.inventory_2_outlined,
+                                color: Color(0xFFE9524A),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '대화 보관함',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    hasSessions
+                                        ? '총 ${_archiveSessions.length}개의 대화가 저장되어 있어요.'
+                                        : '저장된 대화를 여기에서 다시 확인할 수 있어요.',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      height: 1.45,
+                                      color: Colors.black.withValues(
+                                        alpha: 0.58,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (_archiveErrorMessage != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF2EF),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFFFD1C6)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '목록을 불러오지 못했어요.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF9D3F30),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _archiveErrorMessage!,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  height: 1.45,
+                                  color: Color(0xFF7A4A42),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              TextButton(
+                                onPressed: _loadArchiveSessions,
+                                child: const Text('다시 시도'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      if (_isLoadingArchive && !hasSessions) ...[
+                        const SizedBox(height: 64),
+                        const Center(child: CircularProgressIndicator()),
+                        const SizedBox(height: 12),
+                        const Center(
+                          child: Text(
+                            '보관된 대화를 불러오는 중이에요.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF7A706C),
+                            ),
+                          ),
+                        ),
+                      ] else if (!hasSessions) ...[
+                        _buildArchiveEmptyState(),
+                      ] else ...[
+                        for (final session in _archiveSessions) ...[
+                          _buildArchiveSessionCard(session),
+                          const SizedBox(height: 12),
+                        ],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              _buildPrimaryNavigation(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArchiveEmptyState() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x12000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEEE9),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 28,
+              color: Color(0xFFE9524A),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            '아직 저장된 대화가 없어요.',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '새로 대화를 시작하면 제목과 한줄 요약이 자동으로 보관돼요.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.5,
+              color: Colors.black.withValues(alpha: 0.56),
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: _openChatHome,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE9524A),
+            ),
+            child: const Text('새 대화 시작'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArchiveSessionCard(ArchiveSessionSummary session) {
+    return InkWell(
+      onTap: () => _showArchiveSessionDetail(session),
+      borderRadius: BorderRadius.circular(24),
+      child: Ink(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF0DDD7)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x14000000),
+              blurRadius: 16,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEEE9),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _archiveStatusLabel(session.status),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFE9524A),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatArchiveTimestamp(session.lastMessageAt),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.black.withValues(alpha: 0.42),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              session.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF231E1D),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              session.summary,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: Colors.black.withValues(alpha: 0.62),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(
+                  '대화 다시 보기',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black.withValues(alpha: 0.58),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.black.withValues(alpha: 0.36),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildWelcomeScreen() {
@@ -1534,7 +2299,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ),
               ),
-              _buildWelcomeNavigation(),
+              _buildPrimaryNavigation(),
             ],
           ),
         ),
@@ -1600,13 +2365,42 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildWelcomeNavigation() {
-    const items = <({IconData icon, String label})>[
-      (icon: Icons.home_filled, label: '홈'),
-      (icon: Icons.grid_view_rounded, label: '디바이스'),
-      (icon: Icons.search_rounded, label: '챗봇'),
-      (icon: Icons.bar_chart_rounded, label: '제어'),
-      (icon: Icons.article_outlined, label: '메뉴'),
-    ];
+    final items =
+        <({IconData icon, String label, bool active, VoidCallback? onTap})>[
+          (
+            icon: Icons.home_filled,
+            label: '홈',
+            active: !_showArchiveScreen,
+            onTap: () => setState(() {
+              _showWelcomeScreen = true;
+              _showArchiveScreen = false;
+            }),
+          ),
+          (
+            icon: Icons.grid_view_rounded,
+            label: '디바이스',
+            active: false,
+            onTap: null,
+          ),
+          (
+            icon: Icons.search_rounded,
+            label: '챗봇',
+            active: false,
+            onTap: _openChatHome,
+          ),
+          (
+            icon: Icons.bar_chart_rounded,
+            label: '제어',
+            active: false,
+            onTap: null,
+          ),
+          (
+            icon: Icons.article_outlined,
+            label: '메뉴',
+            active: false,
+            onTap: null,
+          ),
+        ];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
@@ -1622,30 +2416,163 @@ class _MobileHomePageState extends State<MobileHomePage> {
           children: [
             for (final item in items)
               Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      item.icon,
-                      size: 18,
-                      color: item.label == '홈'
-                          ? const Color(0xFF1F1B1A)
-                          : Colors.black.withValues(alpha: 0.42),
+                child: InkWell(
+                  onTap: item.onTap,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          item.icon,
+                          size: 18,
+                          color: item.active
+                              ? const Color(0xFF1F1B1A)
+                              : Colors.black.withValues(alpha: 0.42),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: item.active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: item.active
+                                ? const Color(0xFF1F1B1A)
+                                : Colors.black.withValues(alpha: 0.42),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: item.label == '홈'
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: item.label == '홈'
-                            ? const Color(0xFF1F1B1A)
-                            : Colors.black.withValues(alpha: 0.42),
-                      ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryNavigation() {
+    final items =
+        <
+          ({
+            IconData? icon,
+            String? assetPath,
+            String label,
+            bool active,
+            VoidCallback onTap,
+          })
+        >[
+          (
+            icon: Icons.home_filled,
+            assetPath: null,
+            label: '홈',
+            active: _selectedBottomNavIndex == 0,
+            onTap: () => setState(() {
+              _selectedBottomNavIndex = 0;
+              _showWelcomeScreen = true;
+              _showArchiveScreen = false;
+              _archiveOpenedFromChat = false;
+            }),
+          ),
+          (
+            icon: null,
+            assetPath: 'assets/icon/Widget_add.png',
+            label: '디바이스',
+            active: _selectedBottomNavIndex == 1,
+            onTap: () => setState(() {
+              _selectedBottomNavIndex = 1;
+              _showWelcomeScreen = true;
+              _showArchiveScreen = false;
+              _archiveOpenedFromChat = false;
+            }),
+          ),
+          (
+            icon: null,
+            assetPath: 'assets/icon/Chat_search.png',
+            label: '챗봇',
+            active: _selectedBottomNavIndex == 2,
+            onTap: _openChatHome,
+          ),
+          (
+            icon: null,
+            assetPath: 'assets/icon/Line_up.png',
+            label: '케어',
+            active: _selectedBottomNavIndex == 3,
+            onTap: () => setState(() {
+              _selectedBottomNavIndex = 3;
+              _showWelcomeScreen = true;
+              _showArchiveScreen = false;
+              _archiveOpenedFromChat = false;
+            }),
+          ),
+          (
+            icon: null,
+            assetPath: 'assets/icon/Chart.png',
+            label: '메뉴',
+            active: _selectedBottomNavIndex == 4,
+            onTap: () => setState(() {
+              _selectedBottomNavIndex = 4;
+              _showWelcomeScreen = true;
+              _showArchiveScreen = false;
+              _archiveOpenedFromChat = false;
+            }),
+          ),
+        ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.92),
+        border: Border(
+          top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            for (final item in items)
+              Expanded(
+                child: InkWell(
+                  onTap: item.onTap,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        item.assetPath != null
+                            ? _BottomNavAssetIcon(
+                                assetPath: item.assetPath!,
+                                active: item.active,
+                              )
+                            : Icon(
+                                item.icon,
+                                size: 18,
+                                color: item.active
+                                    ? const Color(0xFF1F1B1A)
+                                    : Colors.black.withValues(alpha: 0.42),
+                              ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: item.active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: item.active
+                                ? const Color(0xFF1F1B1A)
+                                : Colors.black.withValues(alpha: 0.42),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
           ],
@@ -2840,6 +3767,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         actions: [
           _TopBarIconButton(
+            tooltip: '보관함',
+            onPressed: _openArchiveScreen,
+            child: const _ArchiveOutlineIcon(),
+          ),
+          const SizedBox(width: 2),
+          _TopBarIconButton(
             tooltip: '대화 초기화',
             onPressed: _resetConversation,
             child: const _TrashOutlineIcon(),
@@ -2847,7 +3780,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
           const SizedBox(width: 2),
           _TopBarIconButton(
             tooltip: '채팅 닫기',
-            onPressed: () => setState(() => _showWelcomeScreen = true),
+            onPressed: () => setState(() {
+              _showWelcomeScreen = true;
+              _showArchiveScreen = false;
+            }),
             child: const _CloseOutlineIcon(),
           ),
           const SizedBox(width: 10),
@@ -2897,7 +3833,90 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showArchiveScreen) {
+      return _buildArchiveScreen();
+    }
     return _showWelcomeScreen ? _buildWelcomeScreen() : _buildChatScreen();
+  }
+}
+
+class ArchiveSessionSummary {
+  const ArchiveSessionSummary({
+    required this.id,
+    required this.userId,
+    required this.productId,
+    required this.title,
+    required this.summary,
+    required this.status,
+    required this.lastMessageAt,
+  });
+
+  final int id;
+  final int userId;
+  final int? productId;
+  final String title;
+  final String summary;
+  final String status;
+  final String? lastMessageAt;
+
+  factory ArchiveSessionSummary.fromJson(Map<dynamic, dynamic> json) {
+    return ArchiveSessionSummary(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      userId: (json['user_id'] as num?)?.toInt() ?? 0,
+      productId: (json['product_id'] as num?)?.toInt(),
+      title: json['title']?.toString() ?? '',
+      summary: json['summary']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'active',
+      lastMessageAt: json['last_message_at']?.toString(),
+    );
+  }
+}
+
+class ArchiveMessage {
+  const ArchiveMessage({
+    required this.id,
+    required this.sessionId,
+    required this.role,
+    required this.messageType,
+    required this.content,
+    required this.attachmentNames,
+    required this.createdAt,
+  });
+
+  final int id;
+  final int sessionId;
+  final String role;
+  final String messageType;
+  final String content;
+  final List<String> attachmentNames;
+  final String? createdAt;
+
+  factory ArchiveMessage.fromJson(Map<dynamic, dynamic> json) {
+    final attachmentNames = <String>[];
+    final rawAttachments = json['attachments'];
+    if (rawAttachments is Map) {
+      final rawItems = rawAttachments['items'];
+      if (rawItems is List) {
+        for (final item in rawItems) {
+          if (item is Map) {
+            final fileName = item['file_name']?.toString().trim();
+            if (fileName != null && fileName.isNotEmpty) {
+              attachmentNames.add(fileName);
+            }
+          }
+        }
+      }
+    }
+
+    return ArchiveMessage(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      sessionId: (json['session_id'] as num?)?.toInt() ?? 0,
+      role: json['role']?.toString() ?? 'user',
+      messageType: json['message_type']?.toString() ?? 'text',
+      content: json['content']?.toString() ?? '',
+      attachmentNames: List.unmodifiable(attachmentNames),
+      createdAt: json['created_at']?.toString(),
+    );
   }
 }
 
@@ -3673,6 +4692,10 @@ class _TopBarIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (child is _TrashOutlineIcon) {
+      return const SizedBox.shrink();
+    }
+
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
@@ -3709,6 +4732,19 @@ class _TrashOutlineIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return SizedBox(
+      width: 17,
+      height: 17,
+      child: CustomPaint(painter: _TrashOutlinePainter()),
+    );
+  }
+}
+
+class _ArchiveOutlineIcon extends StatelessWidget {
+  const _ArchiveOutlineIcon();
+
+  @override
+  Widget build(BuildContext context) {
     return Image.asset(
       'assets/icon/chat_arhive.png',
       width: 17,
@@ -3718,9 +4754,34 @@ class _TrashOutlineIcon extends StatelessWidget {
         return SizedBox(
           width: 17,
           height: 17,
-          child: CustomPaint(painter: _TrashOutlinePainter()),
+          child: Icon(
+            Icons.inventory_2_outlined,
+            size: 17,
+            color: const Color(0xFF23201E),
+          ),
         );
       },
+    );
+  }
+}
+
+class _BottomNavAssetIcon extends StatelessWidget {
+  const _BottomNavAssetIcon({required this.assetPath, required this.active});
+
+  final String assetPath;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      assetPath,
+      width: 18,
+      height: 18,
+      fit: BoxFit.contain,
+      color: active
+          ? const Color(0xFF1F1B1A)
+          : Colors.black.withValues(alpha: 0.42),
+      colorBlendMode: BlendMode.srcIn,
     );
   }
 }
