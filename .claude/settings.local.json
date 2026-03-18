@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python -c \"from PIL import Image; print\\(''PIL OK''\\)\")",
       "Bash(xargs grep:*)",
-      "Bash(ipconfig)"
+      "Bash(ipconfig)",
+      "Bash(ls c:/Users/4151/Downloads/dx_backup_20260313_143719/*centroid*)",
+      "Bash(ls c:/Users/4151/Downloads/dx_backup_20260313_143719/*.npy)"
     ]
   }
 }

@@ -84,6 +84,12 @@ RESPONSE_MODE_EXAMPLES = {
     ),
     "conversation": (
         "고마워요",
+        "감사합니다",
+        "해결됐어요",
+        "고쳐졌어요",
+        "됐어요 감사해요",
+        "문제 없어졌어요",
+        "괜찮아졌어요",
         "다시 설명해줘",
         "쉽게 설명해줘",
         "요약해줘",
@@ -769,8 +775,26 @@ def classify_response_mode(bundle: AgentEvidenceBundle) -> str:
         "안되",
         "안 돼",
     )
+    # Expressions that clearly signal the issue is resolved or the user is closing the conversation.
+    # These must be checked BEFORE followup_keywords to avoid "해결됐어" being misrouted.
+    resolution_keywords = (
+        "해결됐어",
+        "해결됐어요",
+        "해결됐습니다",
+        "고쳐졌어",
+        "고쳐졌어요",
+        "됐어요",
+        "됐습니다",
+        "해결했어",
+        "해결했어요",
+        "문제없어",
+        "문제없어요",
+        "괜찮아졌어",
+        "괜찮아졌어요",
+    )
     general_chat_keywords = (
         "고마워",
+        "고마워요",
         "감사",
         "안녕",
         "반가워",
@@ -827,6 +851,10 @@ def classify_response_mode(bundle: AgentEvidenceBundle) -> str:
     for keyword in followup_keywords:
         if keyword in latest_message:
             keyword_scores["diagnosis_followup"] += 0.12 if " " in keyword else 0.08
+
+    # Resolution/closing expressions override followup keyword matches (e.g. "해결됐어" contains "해결").
+    if any(kw in latest_message for kw in resolution_keywords):
+        return "conversation"
 
     if keyword_scores["diagnosis"] >= 0.16:
         return "diagnosis"
