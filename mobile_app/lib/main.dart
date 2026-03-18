@@ -892,7 +892,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             Text(
                               '음성채팅',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: Color(0xFF5D5B5B),
                                 height: 1.125,
@@ -927,7 +927,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             Text(
                               '소음/진동',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: Color(0xFF5D5B5B),
                                 height: 1.125,
