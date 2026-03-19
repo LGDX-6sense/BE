@@ -346,7 +346,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   bool get _isRecordingActive => _isRecordingVoice || _isRecordingNoise;
 
-   _ModePresentation get _modePresentation {
+  _ModePresentation get _modePresentation {
     switch (_assistantMode) {
       case AssistantMode.audio:
         return const _ModePresentation(
@@ -888,7 +888,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.mic_rounded, size: 24, color: Color(0xFF5D5B5B)),
+                            Icon(
+                              Icons.mic_rounded,
+                              size: 24,
+                              color: Color(0xFF5D5B5B),
+                            ),
                             SizedBox(height: 4),
                             Text(
                               '음성채팅',
@@ -923,7 +927,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.graphic_eq_rounded, size: 24, color: Color(0xFF5D5B5B)),
+                            Icon(
+                              Icons.graphic_eq_rounded,
+                              size: 24,
+                              color: Color(0xFF5D5B5B),
+                            ),
                             SizedBox(height: 4),
                             Text(
                               '소음/진동',
@@ -1360,16 +1368,19 @@ class _MobileHomePageState extends State<MobileHomePage> {
       final routingRequired = decoded['routing_required'] == true;
       final routingIntent = decoded['routing_intent']?.toString();
       const asRoutingIntents = {'as_request', 'connect_agent', 'book_visit'};
-      final isAsRouting = routingRequired && asRoutingIntents.contains(routingIntent);
+      final isAsRouting =
+          routingRequired && asRoutingIntents.contains(routingIntent);
       final nextRoutingStep = ServiceRoutingStep.none;
 
       // AS 관련 인텐트 → 마지막 턴 assistant를 __AS_ROUTING__으로 교체
       final rawAssistantMessage =
           decoded['assistant_message']?.toString().trim() ??
           (mergedHistory.isNotEmpty ? mergedHistory.last.assistant : '');
-      final assistantMessage =
-          isAsRouting ? '__AS_ROUTING__' : rawAssistantMessage;
-      final shouldSpeak = _autoSpeak && assistantMessage.isNotEmpty && !isAsRouting;
+      final assistantMessage = isAsRouting
+          ? '__AS_ROUTING__'
+          : rawAssistantMessage;
+      final shouldSpeak =
+          _autoSpeak && assistantMessage.isNotEmpty && !isAsRouting;
 
       final finalHistory = isAsRouting && mergedHistory.isNotEmpty
           ? [
@@ -2017,7 +2028,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
               onPressed: _closeArchiveScreen,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF212121)),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 20,
+                color: Color(0xFF212121),
+              ),
             ),
             const Text(
               '채팅 보관함',
@@ -2056,8 +2071,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     tooltip: '새로고침',
                     onPressed: _loadArchiveSessions,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF606C80)),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      size: 16,
+                      color: Color(0xFF606C80),
+                    ),
                   ),
                 ],
               ),
@@ -2140,15 +2162,19 @@ class _MobileHomePageState extends State<MobileHomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
-                  Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF606C80)),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: Color(0xFF606C80),
+                  ),
                   SizedBox(width: 4),
                   Text(
                     '채팅 기록은 최대 3년까지 보관할 수 있어요.',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 9,
                       fontWeight: FontWeight.w400,
                       color: Color(0xFF606C80),
-                      height: 1.17,
+                      height: 2,
                     ),
                   ),
                 ],
@@ -2167,13 +2193,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: const [
-          Icon(Icons.chat_bubble_outline_rounded, size: 64, color: Color(0xFFD9D9D9)),
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 64,
+            color: Color(0xFFD9D9D9),
+          ),
           SizedBox(height: 12),
           Text(
             '보관된 채팅이 없어요.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.w400,
               color: Color(0xFF212121),
               height: 1.125,
@@ -2378,7 +2408,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         const SizedBox(height: 48),
                         // NEW 배지
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE95744),
                             borderRadius: BorderRadius.circular(4),
@@ -2426,10 +2459,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                 children: [
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(left: 19, top: 16, bottom: 16),
+                                      padding: const EdgeInsets.only(
+                                        left: 19,
+                                        top: 16,
+                                        bottom: 16,
+                                      ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           const Text(
                                             '제품과 관련된 질문은\n저에게 물어보세요!',
@@ -2442,10 +2481,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                           ),
                                           const SizedBox(height: 8),
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: const Color(0xFFD6DBFC),
-                                              borderRadius: BorderRadius.circular(100),
+                                              borderRadius:
+                                                  BorderRadius.circular(100),
                                             ),
                                             child: const Text(
                                               'Chat REBO 사용하기',
@@ -2465,7 +2508,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                     width: 167,
                                     height: 125,
                                     child: Image.asset(
-                                      _characterAssetForMode(AssistantMode.maincharacter),
+                                      _characterAssetForMode(
+                                        AssistantMode.maincharacter,
+                                      ),
                                       fit: BoxFit.cover,
                                       alignment: Alignment.bottomRight,
                                     ),
@@ -2483,18 +2528,23 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             children: [
                               const Text(
                                 'AI가 생성한 응답은 부정확할 수 있습니다.',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Color(0xFF5D5B5B), height: 1.17),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF6A6764),
+                                  height: 1.2,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               const Text(
                                 '더보기',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                  color: Color(0xFF5D5B5B),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF6A6764),
                                   decoration: TextDecoration.underline,
-                                  decorationColor: Color(0xFF5D5B5B),
-                                  height: 1.17,
+                                  decorationColor: Color(0xFF6A6764),
+                                  height: 1.2,
                                 ),
                               ),
                             ],
@@ -2517,7 +2567,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildWelcomeComposer() {
     return SizedBox(
-      height: 48,
+      height: 44,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
@@ -2551,8 +2601,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               child: Text(
                 '메시지를 입력하세요',
                 style: TextStyle(
-                  fontSize: 16,
-                  color: const Color(0xFF5D5B5B).withValues(alpha: 0.70),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF6A6764).withValues(alpha: 0.78),
+                  height: 1.15,
                 ),
               ),
             ),
@@ -2831,11 +2883,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF937E).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF937E).withValues(alpha: 0.60),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 5),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF7469).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF7469).withValues(alpha: 0.60),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 5),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF5555).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5555).withValues(alpha: 0.60),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -2918,7 +2991,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ? '안녕하세요, $_displayName님!\n고장·AS 전용 상담사 REBO 에요.\n어떤 문제가 궁금하신가요?'
                   : _modePresentation.title,
               style: TextStyle(
-                color: isIdle ? const Color(0xFF212121) : const Color(0xFFFF937E),
+                color: isIdle
+                    ? const Color(0xFF212121)
+                    : const Color(0xFFFF937E),
                 fontSize: isIdle ? 14 : 18,
                 fontWeight: FontWeight.w600,
                 height: 1.44,
@@ -2930,15 +3005,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.70),
                 borderRadius: BorderRadius.circular(100),
-                border: Border.all(
-                  color: const Color(0xFFFF937E),
-                  width: 1.2,
-                ),
+                border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.photo_camera_outlined, size: 13, color: Color(0xFFEB4C4C)),
+                  Icon(
+                    Icons.photo_camera_outlined,
+                    size: 13,
+                    color: Color(0xFFEB4C4C),
+                  ),
                   SizedBox(width: 5),
                   Text(
                     '사진/음성으로 더 정확한 진단이 가능해요',
@@ -3172,7 +3248,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Icon(icon, size: 16, color: const Color(0xFF999999)),
-                          const Icon(Icons.open_in_full_rounded, size: 14, color: Color(0xFF222222)),
+                          const Icon(
+                            Icons.open_in_full_rounded,
+                            size: 14,
+                            color: Color(0xFF222222),
+                          ),
                         ],
                       ),
                       Align(
@@ -3206,7 +3286,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         color: Colors.black.withValues(alpha: 0.42),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -3218,27 +3302,42 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
 
     if (_selectedAudioName != null) {
-      chips.add(buildAudioCard(
-        name: _selectedAudioName!,
-        icon: Icons.audio_file_rounded,
-        onDelete: () => setState(() { _selectedAudio = null; _selectedAudioName = null; }),
-      ));
+      chips.add(
+        buildAudioCard(
+          name: _selectedAudioName!,
+          icon: Icons.audio_file_rounded,
+          onDelete: () => setState(() {
+            _selectedAudio = null;
+            _selectedAudioName = null;
+          }),
+        ),
+      );
     }
 
     if (_recordedVoiceName != null) {
-      chips.add(buildAudioCard(
-        name: _recordedVoiceName!,
-        icon: Icons.mic_rounded,
-        onDelete: () => setState(() { _recordedVoice = null; _recordedVoiceName = null; }),
-      ));
+      chips.add(
+        buildAudioCard(
+          name: _recordedVoiceName!,
+          icon: Icons.mic_rounded,
+          onDelete: () => setState(() {
+            _recordedVoice = null;
+            _recordedVoiceName = null;
+          }),
+        ),
+      );
     }
 
     if (_recordedNoiseName != null) {
-      chips.add(buildAudioCard(
-        name: _recordedNoiseName!,
-        icon: Icons.graphic_eq_rounded,
-        onDelete: () => setState(() { _recordedNoise = null; _recordedNoiseName = null; }),
-      ));
+      chips.add(
+        buildAudioCard(
+          name: _recordedNoiseName!,
+          icon: Icons.graphic_eq_rounded,
+          onDelete: () => setState(() {
+            _recordedNoise = null;
+            _recordedNoiseName = null;
+          }),
+        ),
+      );
     }
 
     return chips;
@@ -3250,7 +3349,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
     String? imagePath,
     String? imageName,
   }) {
-    final foreground = isUser ? const Color(0xFF5D5B5B) : const Color(0xFF312726);
+    final foreground = isUser
+        ? const Color(0xFF5D5B5B)
+        : const Color(0xFF312726);
     final displayMessage = isUser && imagePath != null
         ? _stripDisplayedImageAttachmentLine(message)
         : message;
@@ -3266,7 +3367,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
         child: Column(
-          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isUser
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             if (isUser && imagePath != null) ...[
               ClipRRect(
@@ -3283,7 +3386,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             if (displayMessage.isNotEmpty)
               if (isUser)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.only(
@@ -3325,7 +3431,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         }
                       },
                       child: Icon(
-                        _autoSpeak ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                        _autoSpeak
+                            ? Icons.volume_up_rounded
+                            : Icons.volume_off_rounded,
                         size: 18,
                         color: const Color(0xFF212121).withValues(alpha: 0.40),
                       ),
@@ -3642,16 +3750,35 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   static const _asRequestKeywords = [
-    'as', 'a/s', 'as신청', 'a/s신청', 'as 신청', 'a/s 신청',
-    '서비스신청', '서비스 신청', '수리신청', '수리 신청',
-    '출장신청', '출장 신청', '출장서비스', '출장 서비스',
-    '기사신청', '기사 신청', '방문수리', '방문 수리',
-    '수리요청', '수리 요청', 'as요청', 'as 요청',
+    'as',
+    'a/s',
+    'as신청',
+    'a/s신청',
+    'as 신청',
+    'a/s 신청',
+    '서비스신청',
+    '서비스 신청',
+    '수리신청',
+    '수리 신청',
+    '출장신청',
+    '출장 신청',
+    '출장서비스',
+    '출장 서비스',
+    '기사신청',
+    '기사 신청',
+    '방문수리',
+    '방문 수리',
+    '수리요청',
+    '수리 요청',
+    'as요청',
+    'as 요청',
   ];
 
   bool _isAsRequestMessage(String msg) {
     final normalized = msg.trim().toLowerCase();
-    return _asRequestKeywords.any((kw) => normalized == kw || normalized.contains(kw));
+    return _asRequestKeywords.any(
+      (kw) => normalized == kw || normalized.contains(kw),
+    );
   }
 
   Widget _buildAsRoutingResponse() {
@@ -3725,10 +3852,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(
-                    user: '자가점검',
-                    assistant: '__SELF_CHECK__',
-                  ),
+                  const ChatTurn(user: '자가점검', assistant: '__SELF_CHECK__'),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3744,7 +3868,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(user: '서비스 전문 상담', assistant: '__SERVICE_CONSULT__'),
+                  const ChatTurn(
+                    user: '서비스 전문 상담',
+                    assistant: '__SERVICE_CONSULT__',
+                  ),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3760,7 +3887,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(user: '출장 서비스 예약', assistant: '__VISIT_SERVICE__'),
+                  const ChatTurn(
+                    user: '출장 서비스 예약',
+                    assistant: '__VISIT_SERVICE__',
+                  ),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3959,7 +4089,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
               children: [
                 const Text(
                   '세부 카테고리 선택',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF212121),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
@@ -3976,16 +4110,27 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 4,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               cat,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF212121)),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF212121),
+                              ),
                             ),
                           ),
-                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFFF937E)),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: Color(0xFFFF937E),
+                          ),
                         ],
                       ),
                     ),
@@ -4023,12 +4168,19 @@ class _MobileHomePageState extends State<MobileHomePage> {
               children: [
                 const Text(
                   '시리얼 넘버(S/N) 입력',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF212121),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '제품 뒷면 또는 측면 스티커에서 확인할 수 있어요.',
-                  style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.52)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.black.withValues(alpha: 0.52),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -4038,18 +4190,26 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     hintText: 'S/N 번호를 입력하세요',
                     filled: true,
                     fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: Color(0xFFFF937E)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.12)),
+                      borderSide: BorderSide(
+                        color: Colors.black.withValues(alpha: 0.12),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: Color(0xFFFF937E), width: 1.5),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFFF937E),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -4068,9 +4228,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFFF937E),
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
-                    child: const Text('입력 완료', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    child: const Text(
+                      '입력 완료',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -4083,112 +4251,125 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildConversationPanel() {
     return ListView(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-        children: [
-          // 새 채팅 유도 배너
-          GestureDetector(
-            onTap: _resetConversation,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF937E).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFF937E).withValues(alpha: 0.25),
-                ),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      children: [
+        // 새 채팅 유도 배너
+        GestureDetector(
+          onTap: _resetConversation,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF937E).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFF937E).withValues(alpha: 0.25),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.add_comment_outlined, size: 16, color: Color(0xFFFF937E)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      '다른 증상을 진단하려면 새 채팅을 시작하세요',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFFFF937E),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const Text(
-                    '새 채팅 →',
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.add_comment_outlined,
+                  size: 16,
+                  color: Color(0xFFFF937E),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '다른 증상을 진단하려면 새 채팅을 시작하세요',
                     style: TextStyle(
                       fontSize: 12,
                       color: Color(0xFFFF937E),
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          for (var index = 0; index < _history.length; index++) ...[
-            _buildBubble(
-              _history[index].user,
-              isUser: true,
-              imagePath: _history[index].userImagePath,
-              imageName: _history[index].userImageName,
-            ),
-            if (_history[index].assistant.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              if (_history[index].assistant == '__AS_ROUTING__') ...[
-                _buildAsRoutingResponse(),
-              ] else if (_history[index].assistant == '__SELF_CHECK__') ...[
-                _buildSelfCheckResponse(),
-              ] else if (_history[index].assistant == '__SERVICE_CONSULT__') ...[
-                _buildServiceConsultResponse(),
-              ] else if (_history[index].assistant == '__VISIT_SERVICE__') ...[
-                _buildVisitServiceResponse(),
-              ] else ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Image.asset(
-                    _characterAssetForMode(AssistantMode.idle),
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(height: 12),
-                _buildBubble(_history[index].assistant, isUser: false),
+                const Text(
+                  '새 채팅 →',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFFF937E),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
-              // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
-              if (index == _history.length - 1 &&
-                  !_isSubmitting &&
-                  _serviceRoutingStep == ServiceRoutingStep.none &&
-                  _history[index].userImagePath == null &&
-                  _history[index].assistant != '__AS_ROUTING__' &&
-                  _history[index].assistant != '__SELF_CHECK__' &&
-                  _history[index].assistant != '__SERVICE_CONSULT__' &&
-                  _history[index].assistant != '__VISIT_SERVICE__') ...[
-                const SizedBox(height: 12),
-                if (_isAfterCategoryOrSerial(_history[index].user)) ...[
-                  // AS 안내 텍스트
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBF8),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text(
-                      'AS 신청이 필요하시군요!\n아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF5D5B5B), height: 1.5),
+            ),
+          ),
+        ),
+        for (var index = 0; index < _history.length; index++) ...[
+          _buildBubble(
+            _history[index].user,
+            isUser: true,
+            imagePath: _history[index].userImagePath,
+            imageName: _history[index].userImageName,
+          ),
+          if (_history[index].assistant.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            if (_history[index].assistant == '__AS_ROUTING__') ...[
+              _buildAsRoutingResponse(),
+            ] else if (_history[index].assistant == '__SELF_CHECK__') ...[
+              _buildSelfCheckResponse(),
+            ] else if (_history[index].assistant == '__SERVICE_CONSULT__') ...[
+              _buildServiceConsultResponse(),
+            ] else if (_history[index].assistant == '__VISIT_SERVICE__') ...[
+              _buildVisitServiceResponse(),
+            ] else ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  _characterAssetForMode(AssistantMode.idle),
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildBubble(_history[index].assistant, isUser: false),
+            ],
+            // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
+            if (index == _history.length - 1 &&
+                !_isSubmitting &&
+                _serviceRoutingStep == ServiceRoutingStep.none &&
+                _history[index].userImagePath == null &&
+                _history[index].assistant != '__AS_ROUTING__' &&
+                _history[index].assistant != '__SELF_CHECK__' &&
+                _history[index].assistant != '__SERVICE_CONSULT__' &&
+                _history[index].assistant != '__VISIT_SERVICE__') ...[
+              const SizedBox(height: 12),
+              if (_isAfterCategoryOrSerial(_history[index].user)) ...[
+                // AS 안내 텍스트
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBF8),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    'AS 신청이 필요하시군요!\n아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF5D5B5B),
+                      height: 1.5,
                     ),
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildSuggestionChip('상담사 연결', onTap: () {
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildSuggestionChip(
+                      '상담사 연결',
+                      onTap: () {
                         _messageController.text = '상담사 연결해줘';
                         _sendMessage();
-                      }),
-                      _buildSuggestionChip('A/S 신청', onTap: () {
+                      },
+                    ),
+                    _buildSuggestionChip(
+                      'A/S 신청',
+                      onTap: () {
                         setState(() {
                           _history = [
                             ..._history,
@@ -4205,33 +4386,42 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             curve: Curves.easeOut,
                           );
                         });
-                      }),
-                    ],
-                  ),
-                ] else ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildSuggestionChip('세부 카테고리 선택', onTap: _showCategorySheet),
-                      _buildSuggestionChip('시리얼 넘버(S/N) 찾기', onTap: _showSerialNumberSheet),
-                    ],
-                  ),
-                ],
+                      },
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildSuggestionChip(
+                      '세부 카테고리 선택',
+                      onTap: _showCategorySheet,
+                    ),
+                    _buildSuggestionChip(
+                      '시리얼 넘버(S/N) 찾기',
+                      onTap: _showSerialNumberSheet,
+                    ),
+                  ],
+                ),
               ],
             ],
-            if (index == _history.length - 1 &&
-                _serviceRoutingStep != ServiceRoutingStep.none) ...[
-              const SizedBox(height: 10),
-              _buildServiceRoutingPanel(),
-            ],
-            const SizedBox(height: 14),
           ],
-          if (_isSubmitting)
-            Padding(
-              padding: const EdgeInsets.only(top: 8, left: 4),
-              child: Builder(builder: (context) {
-                final hasImage = _history.isNotEmpty && _history.last.userImagePath != null;
+          if (index == _history.length - 1 &&
+              _serviceRoutingStep != ServiceRoutingStep.none) ...[
+            const SizedBox(height: 10),
+            _buildServiceRoutingPanel(),
+          ],
+          const SizedBox(height: 14),
+        ],
+        if (_isSubmitting)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Builder(
+              builder: (context) {
+                final hasImage =
+                    _history.isNotEmpty && _history.last.userImagePath != null;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4276,18 +4466,46 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF937E).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFF937E,
+                            ).withValues(alpha: 0.60),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 5),
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF7469).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFF7469,
+                            ).withValues(alpha: 0.60),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 5),
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF5555).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFF5555,
+                            ).withValues(alpha: 0.60),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 );
-              }),
+              },
             ),
-        ],
+          ),
+      ],
     );
   }
 
@@ -4449,115 +4667,119 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 : SizedBox(
                     height: 48,
                     child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x12000000),
-                          blurRadius: 16,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF4F0),
-                            borderRadius: BorderRadius.circular(12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x12000000),
+                            blurRadius: 16,
+                            offset: Offset(0, 8),
                           ),
-                          child: IconButton(
-                            tooltip: '첨부 메뉴 열기',
-                            onPressed: _isSubmitting
-                                ? null
-                                : _openAttachmentSheet,
-                            padding: EdgeInsets.zero,
-                            icon: Icon(
-                              Icons.add_rounded,
-                              color: _modePresentation.accent,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            enabled: !_isSubmitting,
-                            minLines: 1,
-                            maxLines: 4,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              height: 1.45,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: _modePresentation.hintText,
-                              hintStyle: TextStyle(
-                                fontSize: 16,
-                                color: const Color(0xFF5D5B5B).withValues(alpha: 0.70),
-                              ),
-                              filled: false,
-                              fillColor: Colors.transparent,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                                vertical: 10,
-                              ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: showMicAction
-                                ? const Color(0xFFFFF4F0)
-                                : const Color(0xFFFF937E),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: SizedBox(
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
                             width: 36,
                             height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF4F0),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             child: IconButton(
-                              padding: EdgeInsets.zero,
+                              tooltip: '첨부 메뉴 열기',
                               onPressed: _isSubmitting
                                   ? null
-                                  : (showMicAction
-                                        ? _handleMicTap
-                                        : _sendMessage),
-                              icon: _isSubmitting
-                                  ? const SizedBox.square(
-                                      dimension: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : Icon(
-                                      showMicAction
-                                          ? Icons.mic_none_rounded
-                                          : Icons.send_rounded,
-                                      size: 18,
-                                      color: showMicAction
-                                          ? Colors.black.withValues(alpha: 0.36)
-                                          : Colors.white,
-                                    ),
+                                  : _openAttachmentSheet,
+                              padding: EdgeInsets.zero,
+                              icon: Icon(
+                                Icons.add_rounded,
+                                color: _modePresentation.accent,
+                                size: 20,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              enabled: !_isSubmitting,
+                              minLines: 1,
+                              maxLines: 4,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                height: 1.45,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: _modePresentation.hintText,
+                                hintStyle: TextStyle(
+                                  fontSize: 16,
+                                  color: const Color(
+                                    0xFF5D5B5B,
+                                  ).withValues(alpha: 0.70),
+                                ),
+                                filled: false,
+                                fillColor: Colors.transparent,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 0,
+                                  vertical: 10,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: showMicAction
+                                  ? const Color(0xFFFFF4F0)
+                                  : const Color(0xFFFF937E),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: SizedBox(
+                              width: 36,
+                              height: 36,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: _isSubmitting
+                                    ? null
+                                    : (showMicAction
+                                          ? _handleMicTap
+                                          : _sendMessage),
+                                icon: _isSubmitting
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Icon(
+                                        showMicAction
+                                            ? Icons.mic_none_rounded
+                                            : Icons.send_rounded,
+                                        size: 18,
+                                        color: showMicAction
+                                            ? Colors.black.withValues(
+                                                alpha: 0.36,
+                                              )
+                                            : Colors.white,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   ),
           ],
         ),
@@ -4693,7 +4915,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               onTap: _resetConversation,
               child: Container(
                 margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF937E).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
@@ -4770,65 +4995,65 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
           ),
           SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  _history.isEmpty ? 12 : 4,
-                  16,
-                  0,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      _history.isEmpty ? 12 : 4,
+                      16,
+                      0,
+                    ),
+                    child: Column(
+                      children: [
+                        if (_errorMessage != null) ...[
+                          _buildErrorCard(),
+                          const SizedBox(height: 10),
+                        ],
+                        Expanded(
+                          child: (_isRecordingActive || _history.isEmpty)
+                              ? _buildChatIntroPanel()
+                              : _buildConversationPanel(),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    if (_errorMessage != null) ...[
-                      _buildErrorCard(),
-                      const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'AI가 생성한 응답은 부정확할 수 있습니다.',
+                        style: TextStyle(
+                          color: Color(0xFF5D5B5B),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
+                          height: 1.2,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '더보기',
+                        style: TextStyle(
+                          color: Color(0xFF5D5B5B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF5D5B5B),
+                          height: 1.17,
+                        ),
+                      ),
                     ],
-                    Expanded(
-                      child: (_isRecordingActive || _history.isEmpty)
-                          ? _buildChatIntroPanel()
-                          : _buildConversationPanel(),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                _buildComposer(),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Text(
-                    'AI가 생성한 응답은 부정확할 수 있습니다.',
-                    style: TextStyle(
-                      color: Color(0xFF5D5B5B),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      height: 1.17,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    '더보기',
-                    style: TextStyle(
-                      color: Color(0xFF5D5B5B),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      decoration: TextDecoration.underline,
-                      decorationColor: Color(0xFF5D5B5B),
-                      height: 1.17,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            _buildComposer(),
-          ],
-        ),
-      ),
+          ),
         ],
       ),
     );

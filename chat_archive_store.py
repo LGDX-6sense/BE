@@ -184,6 +184,142 @@ def _extract_solution_line(text: str) -> str:
     return ""
 
 
+def _all_history_text(history: Sequence[Dict[str, str]]) -> str:
+    parts: List[str] = []
+    for turn in history:
+        user_text = _strip_attachment_lines(turn.get("user", ""))
+        assistant_text = _clean_assistant_text(turn.get("assistant", ""))
+        if user_text:
+            parts.append(user_text)
+        if assistant_text:
+            parts.append(assistant_text)
+    return _normalize_text(" ".join(parts))
+
+
+def _contains_any(text: str, keywords: Sequence[str]) -> bool:
+    normalized = _normalize_text(text)
+    return any(keyword in normalized for keyword in keywords)
+
+
+def _extract_issue_phrase(
+    latest_user: str,
+    latest_assistant: str,
+    history_text: str,
+) -> str:
+    combined = _normalize_text(f"{latest_user} {latest_assistant} {history_text}")
+    device = _infer_device_label(combined)
+    error_code = _extract_error_code(combined)
+
+    if device and error_code:
+        return f"{device} {error_code} 에러코드"
+    if error_code:
+        return f"{error_code} 에러코드"
+
+    symptom_patterns = [
+        (("온풍", "나오지"), "온풍이 나오지 않는 증상"),
+        (("시원하지",), "시원하지 않은 증상"),
+        (("안 시원",), "시원하지 않은 증상"),
+        (("차갑지",), "차갑지 않은 증상"),
+        (("배수",), "배수가 되지 않는 증상"),
+        (("물이 안 빠",), "배수가 되지 않는 증상"),
+        (("누수",), "누수 증상"),
+        (("물 새",), "누수 증상"),
+        (("소음",), "이상 소음 증상"),
+        (("소리",), "이상 소음 증상"),
+        (("진동",), "진동 증상"),
+        (("냄새",), "냄새 문제"),
+        (("전원이 안",), "전원 문제"),
+        (("안 켜",), "전원 문제"),
+        (("냉기가 약",), "냉기가 약한 증상"),
+    ]
+    for keywords, label in symptom_patterns:
+        if all(keyword in combined for keyword in keywords):
+            if device and device not in label:
+                return f"{device} {label}"
+            return label
+
+    if latest_user:
+        compact = re.sub(
+            r"(이에요|예요|해요|나요|떠요|있어요|인가요|일까요|싶어요|해주세요|해줘)$",
+            "",
+            _normalize_text(latest_user),
+        )
+        if device and device not in compact:
+            compact = f"{device} {compact}"
+        return _truncate(compact, 40)
+
+    return _truncate(_extract_first_sentence(latest_assistant), 40)
+
+
+def _extract_action_phrase(text: str) -> str:
+    solution = _extract_solution_line(text)
+    combined = _normalize_text(text)
+    source = _normalize_text(f"{solution} {combined}")
+
+    mapped_actions = [
+        (("호스", "물", "빼"), "호스 안의 물을 빼는 자가진단"),
+        (("호스", "연결"), "호스 연결 상태를 확인하는 자가진단"),
+        (("필터", "청소"), "필터 청소 자가진단"),
+        (("문", "닫"), "문 닫힘 상태를 확인하는 자가점검"),
+        (("전원", "다시"), "전원을 다시 켜보는 자가점검"),
+        (("전원", "꺼"), "전원을 다시 켜보는 자가점검"),
+        (("실외기", "점검"), "실외기 상태를 확인하는 자가점검"),
+        (("리모컨", "건전지"), "리모컨 건전지를 확인하는 자가점검"),
+        (("배수", "점검"), "배수 상태를 확인하는 자가점검"),
+        (("자가진단",), "자가진단"),
+        (("자가점검",), "자가점검"),
+    ]
+    for keywords, label in mapped_actions:
+        if all(keyword in source for keyword in keywords):
+            return label
+
+    if solution:
+        cleaned = _normalize_text(solution).rstrip(". ")
+        cleaned = re.sub(r"(먼저|우선)\s+", "", cleaned)
+        cleaned = re.sub(r"(해보세요|보세요|해주세요|해 주세요|하세요)$", "", cleaned)
+        if cleaned:
+            return _truncate(f"{cleaned} 자가점검", 46)
+
+    return ""
+
+
+def _detect_resolved(history_text: str) -> bool:
+    return _contains_any(
+        history_text,
+        (
+            "해결됐",
+            "해결되었",
+            "해결됐어요",
+            "정상으로 돌아",
+            "정상 작동",
+            "괜찮아졌",
+            "사라졌",
+            "없어졌",
+            "문제가 해결",
+        ),
+    )
+
+
+def _detect_service_request(history_text: str, routing_intent: str, routing_required: bool) -> bool:
+    if routing_required and routing_intent in {"connect_agent", "book_visit"}:
+        return True
+    return _contains_any(
+        history_text.lower(),
+        (
+            "as",
+            "a/s",
+            "상담사",
+            "상담 연결",
+            "예약",
+            "출장",
+            "방문",
+            "기사",
+            "서비스 신청",
+            "as 신청",
+        ),
+    )
+
+
 def _build_archive_title(latest_user: str, latest_assistant: str, attachment_name: str) -> str:
     combined = _normalize_text(f"{latest_user} {latest_assistant} {attachment_name}")
     error_code = _extract_error_code(combined)
