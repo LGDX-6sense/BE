@@ -1351,23 +1351,31 @@ class _MobileHomePageState extends State<MobileHomePage> {
       );
       final routingRequired = decoded['routing_required'] == true;
       final routingIntent = decoded['routing_intent']?.toString();
-      final nextRoutingStep = !routingRequired
-          ? ServiceRoutingStep.none
-          : (routingIntent == 'connect_agent' || routingIntent == 'book_visit')
-          ? ServiceRoutingStep.chooseService
-          : ServiceRoutingStep.askDiagnosis;
+      const asRoutingIntents = {'as_request', 'connect_agent', 'book_visit'};
+      final isAsRouting = routingRequired && asRoutingIntents.contains(routingIntent);
+      final nextRoutingStep = ServiceRoutingStep.none;
 
-      final assistantMessage =
+      // AS 관련 인텐트 → 마지막 턴 assistant를 __AS_ROUTING__으로 교체
+      final rawAssistantMessage =
           decoded['assistant_message']?.toString().trim() ??
           (mergedHistory.isNotEmpty ? mergedHistory.last.assistant : '');
-      final shouldSpeak = _autoSpeak && assistantMessage.isNotEmpty;
+      final assistantMessage =
+          isAsRouting ? '__AS_ROUTING__' : rawAssistantMessage;
+      final shouldSpeak = _autoSpeak && assistantMessage.isNotEmpty && !isAsRouting;
+
+      final finalHistory = isAsRouting && mergedHistory.isNotEmpty
+          ? [
+              ...mergedHistory.sublist(0, mergedHistory.length - 1),
+              mergedHistory.last.copyWith(assistant: '__AS_ROUTING__'),
+            ]
+          : mergedHistory;
 
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _history = mergedHistory;
+        _history = finalHistory;
         _chatSessionId = decoded['session_id'] is num
             ? (decoded['session_id'] as num).toInt()
             : _chatSessionId;
@@ -3725,6 +3733,105 @@ class _MobileHomePageState extends State<MobileHomePage> {
     return _asCategories.any((cat) => userMsg.trim() == cat);
   }
 
+  static const _asRequestKeywords = [
+    'as', 'a/s', 'as신청', 'a/s신청', 'as 신청', 'a/s 신청',
+    '서비스신청', '서비스 신청', '수리신청', '수리 신청',
+    '출장신청', '출장 신청', '출장서비스', '출장 서비스',
+    '기사신청', '기사 신청', '방문수리', '방문 수리',
+    '수리요청', '수리 요청', 'as요청', 'as 요청',
+  ];
+
+  bool _isAsRequestMessage(String msg) {
+    final normalized = msg.trim().toLowerCase();
+    return _asRequestKeywords.any((kw) => normalized == kw || normalized.contains(kw));
+  }
+
+  Widget _buildAsRoutingResponse() {
+    Widget chip(String label, VoidCallback onTap) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.70),
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
+          ),
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFEB4C4C),
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              height: 1.4,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Image.asset(
+          _characterAssetForMode(AssistantMode.idle),
+          width: 80,
+          height: 80,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'AS 신청이 필요하시군요!\n그 전에 자가점검은 어떠신가요?',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          '어떤 해결방법으로 진행하시겠어요?',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            height: 1.43,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            chip('자가점검', () {
+              _messageController.text = '자가점검 방법을 알려줘';
+              _sendMessage();
+            }),
+            chip('서비스 전문 상담', () {
+              _messageController.text = '서비스 전문 상담 연결해줘';
+              _sendMessage();
+            }),
+            chip('출장 서비스 예약', () {
+              _messageController.text = '출장 서비스 예약하고 싶어요';
+              _sendMessage();
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildSuggestionChip(String label, {required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -3953,22 +4060,27 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             if (_history[index].assistant.trim().isNotEmpty) ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Image.asset(
-                  _characterAssetForMode(AssistantMode.idle),
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.contain,
+              if (_history[index].assistant == '__AS_ROUTING__') ...[
+                _buildAsRoutingResponse(),
+              ] else ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Image.asset(
+                    _characterAssetForMode(AssistantMode.idle),
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.contain,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _buildBubble(_history[index].assistant, isUser: false),
+                const SizedBox(height: 12),
+                _buildBubble(_history[index].assistant, isUser: false),
+              ],
               // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
               if (index == _history.length - 1 &&
                   !_isSubmitting &&
                   _serviceRoutingStep == ServiceRoutingStep.none &&
-                  _history[index].userImagePath == null) ...[
+                  _history[index].userImagePath == null &&
+                  _history[index].assistant != '__AS_ROUTING__') ...[
                 const SizedBox(height: 12),
                 if (_isAfterCategoryOrSerial(_history[index].user)) ...[
                   // AS 안내 텍스트
@@ -3994,8 +4106,22 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         _sendMessage();
                       }),
                       _buildSuggestionChip('A/S 신청', onTap: () {
-                        _messageController.text = 'A/S 신청하고 싶어요';
-                        _sendMessage();
+                        setState(() {
+                          _history = [
+                            ..._history,
+                            const ChatTurn(
+                              user: 'A/S 신청',
+                              assistant: '__AS_ROUTING__',
+                            ),
+                          ];
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollController.animateTo(
+                            _scrollController.position.maxScrollExtent,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        });
                       }),
                     ],
                   ),

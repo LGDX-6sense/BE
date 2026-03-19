@@ -55,6 +55,18 @@ INTENT_EXAMPLES: Dict[str, List[str]] = {
         "자가 해결 방법을 알려줘",
         "현재 증상이 왜 생기는지 쉽게 설명해줘",
     ],
+    "as_request": [
+        "AS 신청하고 싶어요",
+        "AS 받고 싶어요",
+        "A/S 신청해주세요",
+        "서비스 신청할게요",
+        "수리 신청하고 싶어요",
+        "고장 수리 맡기고 싶어요",
+        "제품 고쳐주세요",
+        "수리 받고 싶어요",
+        "AS 어떻게 해요",
+        "서비스 접수하고 싶어요",
+    ],
     "connect_agent": [
         "상담하고 싶어요",
         "상담사 연결해 주세요",
@@ -76,6 +88,21 @@ INTENT_EXAMPLES: Dict[str, List[str]] = {
 }
 
 INTENT_KEYWORD_HINTS: Dict[str, List[str]] = {
+    "as_request": [
+        "as",
+        "a/s",
+        "as신청",
+        "a/s신청",
+        "as 신청",
+        "a/s 신청",
+        "서비스신청",
+        "서비스 신청",
+        "수리신청",
+        "수리 신청",
+        "수리 접수",
+        "as접수",
+        "as 접수",
+    ],
     "connect_agent": [
         "상담",
         "상담원",
@@ -301,16 +328,22 @@ def classify_service_intent(message: str) -> Dict[str, Any]:
 
     keyword_scores = {
         "normal_chat": 0.0,
+        "as_request": 0.0,
         "connect_agent": 0.0,
         "book_visit": 0.0,
     }
     for label, keywords in INTENT_KEYWORD_HINTS.items():
         for keyword in keywords:
             if keyword in normalized_message:
-                keyword_scores[label] += 0.12 if " " in keyword else 0.08
+                # as_request 키워드는 가중치를 높게 부여
+                if label == "as_request":
+                    keyword_scores[label] += 0.20 if " " in keyword else 0.16
+                else:
+                    keyword_scores[label] += 0.12 if " " in keyword else 0.08
 
     vector_scores = {
         "normal_chat": 0.0,
+        "as_request": 0.0,
         "connect_agent": 0.0,
         "book_visit": 0.0,
     }
@@ -331,9 +364,9 @@ def classify_service_intent(message: str) -> Dict[str, Any]:
 
     combined_scores = {
         label: vector_scores.get(label, 0.0) + keyword_scores.get(label, 0.0)
-        for label in ("normal_chat", "connect_agent", "book_visit")
+        for label in ("normal_chat", "as_request", "connect_agent", "book_visit")
     }
-    service_labels = ("connect_agent", "book_visit")
+    service_labels = ("as_request", "connect_agent", "book_visit")
     best_service_label = max(service_labels, key=lambda label: combined_scores[label])
     best_service_score = combined_scores[best_service_label]
     normal_score = combined_scores["normal_chat"]
