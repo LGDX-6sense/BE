@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -48,7 +49,51 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: SingleChildScrollView(
+      body: Stack(
+        children: [
+          // 블러 원 (좌측 상단)
+          Positioned(
+            left: -120,
+            top: 0,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Color(0xFFBFE1DE).withValues(alpha: 0.80),
+                      Color(0xFFBFE1DE).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 블러 원 (우측 하단)
+          Positioned(
+            right: -120,
+            bottom: 80,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Color(0xFFBFE1DE).withValues(alpha: 0.80),
+                      Color(0xFFBFE1DE).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(19, 0, 19, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,6 +128,8 @@ class HomeScreen extends StatelessWidget {
             _buildThinQCard(),
           ],
         ),
+      ),
+        ],
       ),
     );
   }

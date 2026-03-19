@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
@@ -345,7 +346,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   bool get _isRecordingActive => _isRecordingVoice || _isRecordingNoise;
 
-  _ModePresentation get _modePresentation {
+   _ModePresentation get _modePresentation {
     switch (_assistantMode) {
       case AssistantMode.audio:
         return const _ModePresentation(
@@ -2370,15 +2371,52 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFFBF8), Color(0xFFFFF3EE), Color(0xFFFFECE6)],
+      backgroundColor: const Color(0xFFFCEDEB),
+      body: Stack(
+        children: [
+          // 배경 블러 원 (좌측 상단)
+          Positioned(
+            left: -120,
+            top: MediaQuery.of(context).size.height * 0.05,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
+                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
+          // 배경 블러 원 (우측 하단)
+          Positioned(
+            right: -120,
+            bottom: MediaQuery.of(context).size.height * 0.1,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
+                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
           child: Column(
             children: [
               Expanded(
@@ -2549,6 +2587,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ],
           ),
         ),
+        ],
       ),
     );
   }
@@ -3751,7 +3790,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.70),
             borderRadius: BorderRadius.circular(100),
@@ -3804,29 +3843,195 @@ class _MobileHomePageState extends State<MobileHomePage> {
           '어떤 해결방법으로 진행하시겠어요?',
           style: TextStyle(
             color: Color(0xFF212121),
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
             height: 1.43,
           ),
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             chip('자가점검', () {
-              _messageController.text = '자가점검 방법을 알려줘';
-              _sendMessage();
+              setState(() {
+                _history = [
+                  ..._history,
+                  const ChatTurn(
+                    user: '자가점검',
+                    assistant: '__SELF_CHECK__',
+                  ),
+                ];
+              });
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              });
             }),
+            const SizedBox(width: 6),
             chip('서비스 전문 상담', () {
-              _messageController.text = '서비스 전문 상담 연결해줘';
-              _sendMessage();
+              setState(() {
+                _history = [
+                  ..._history,
+                  const ChatTurn(user: '서비스 전문 상담', assistant: '__SERVICE_CONSULT__'),
+                ];
+              });
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              });
             }),
+            const SizedBox(width: 6),
             chip('출장 서비스 예약', () {
-              _messageController.text = '출장 서비스 예약하고 싶어요';
-              _sendMessage();
+              setState(() {
+                _history = [
+                  ..._history,
+                  const ChatTurn(user: '출장 서비스 예약', assistant: '__VISIT_SERVICE__'),
+                ];
+              });
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollController.animateTo(
+                  _scrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              });
             }),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSelfCheckResponse() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        Text(
+          '자가점검을 도와드릴게요!',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          '자가점검하는 방법은 다음과 같습니다.\n우선, 현재 수리가 필요한 제품의 카테고리 혹은 제품명과 함께 에러코드, 문제상황을 알려주세요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServiceConsultResponse() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '서비스 전문 상담을 도와드릴게요!',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          '서비스 전문 상담을 예약하실 수 있도록 도와드리겠습니다. 다음 링크를 통해 서비스 전문 상담을 진행하실 수 있어요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () {
+            _messageController.text = '서비스 전문 상담';
+            _sendMessage();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.70),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
+            ),
+            child: const Text(
+              '서비스 전문 상담',
+              style: TextStyle(
+                color: Color(0xFFEB4C4C),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVisitServiceResponse() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '출장 서비스 예약을 도와드릴게요!',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          '출장 서비스 예약을 예약하실 수 있도록 도와드리겠습니다. 다음 링크를 통해 출장 서비스 예약을 진행하실 수 있어요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () {
+            _messageController.text = '출장 서비스 예약';
+            _sendMessage();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.70),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
+            ),
+            child: const Text(
+              '출장 서비스 예약',
+              style: TextStyle(
+                color: Color(0xFFEB4C4C),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                height: 1.4,
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -4062,6 +4267,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
               const SizedBox(height: 8),
               if (_history[index].assistant == '__AS_ROUTING__') ...[
                 _buildAsRoutingResponse(),
+              ] else if (_history[index].assistant == '__SELF_CHECK__') ...[
+                _buildSelfCheckResponse(),
+              ] else if (_history[index].assistant == '__SERVICE_CONSULT__') ...[
+                _buildServiceConsultResponse(),
+              ] else if (_history[index].assistant == '__VISIT_SERVICE__') ...[
+                _buildVisitServiceResponse(),
               ] else ...[
                 Align(
                   alignment: Alignment.centerLeft,
@@ -4080,7 +4291,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   !_isSubmitting &&
                   _serviceRoutingStep == ServiceRoutingStep.none &&
                   _history[index].userImagePath == null &&
-                  _history[index].assistant != '__AS_ROUTING__') ...[
+                  _history[index].assistant != '__AS_ROUTING__' &&
+                  _history[index].assistant != '__SELF_CHECK__' &&
+                  _history[index].assistant != '__SERVICE_CONSULT__' &&
+                  _history[index].assistant != '__VISIT_SERVICE__') ...[
                 const SizedBox(height: 12),
                 if (_isAfterCategoryOrSerial(_history[index].user)) ...[
                   // AS 안내 텍스트
@@ -4635,7 +4849,51 @@ class _MobileHomePageState extends State<MobileHomePage> {
           const SizedBox(width: 10),
         ],
       ),
-      body: SafeArea(
+      body: Stack(
+        children: [
+          // 배경 블러 원 (좌측)
+          Positioned(
+            left: -120,
+            top: MediaQuery.of(context).size.height * 0.05,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
+                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 배경 블러 원 (우측)
+          Positioned(
+            right: -120,
+            top: MediaQuery.of(context).size.height * 0.5,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
+                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
         child: Column(
           children: [
             Expanded(
@@ -4691,6 +4949,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
             _buildComposer(),
           ],
         ),
+      ),
+        ],
       ),
     );
   }
