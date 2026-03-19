@@ -964,67 +964,74 @@ class _MobileHomePageState extends State<MobileHomePage> {
           await action();
         }
 
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBF8),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x22000000),
-                  blurRadius: 28,
-                  offset: Offset(0, 18),
-                ),
-              ],
+        return Container(
+          padding: const EdgeInsets.fromLTRB(28, 32, 28, 54),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '첨부 방법 선택',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x0D212121),
+                blurRadius: 4,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '첨부방법',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF212121),
+                  height: 1.11,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '원하는 방법을 선택해주세요',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: Colors.black.withValues(alpha: 0.56),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '필요한 방식을 선택해주세요',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Color(0xFF5D5B5B),
+                  height: 1.14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AttachmentQuickAction(
+                      icon: Icons.photo_camera_outlined,
+                      label: '카메라',
+                      onTap: () => handleTap(_capturePhoto),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _AttachmentQuickAction(
-                        icon: Icons.photo_camera_outlined,
-                        label: '카메라',
-                        onTap: () => handleTap(_capturePhoto),
-                      ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _AttachmentQuickAction(
+                      icon: Icons.image_outlined,
+                      label: '사진',
+                      onTap: () => handleTap(_pickImageFromGallery),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _AttachmentQuickAction(
-                        icon: Icons.image_outlined,
-                        label: '사진',
-                        onTap: () => handleTap(_pickImageFromGallery),
-                      ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _AttachmentQuickAction(
+                      icon: Icons.attach_file_rounded,
+                      label: '파일',
+                      onTap: () => handleTap(_pickAudio),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _AttachmentQuickAction(
-                        icon: Icons.attach_file_rounded,
-                        label: '파일',
-                        onTap: () => handleTap(_pickAudio),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -1995,247 +2002,182 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final hasSessions = _archiveSessions.isNotEmpty;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFEFF1F4),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFFBF8),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: '홈으로',
-          onPressed: _closeArchiveScreen,
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        automaticallyImplyLeading: false,
+        titleSpacing: 19,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'chat_archive',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            IconButton(
+              tooltip: '홈으로',
+              onPressed: _closeArchiveScreen,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF212121)),
             ),
-            Text(
-              '저장된 대화 목록',
+            const Text(
+              '채팅 보관함',
               style: TextStyle(
-                fontSize: 10,
-                color: Colors.black.withValues(alpha: 0.48),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF212121),
+                height: 1.11,
               ),
             ),
+            const SizedBox(width: 24),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: '새 대화',
-            onPressed: _openChatHome,
-            icon: const Icon(Icons.add_comment_outlined),
-          ),
-          IconButton(
-            tooltip: '새로고침',
-            onPressed: _loadArchiveSessions,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFFBF8), Color(0xFFFFF3EE), Color(0xFFFFECE6)],
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: RefreshIndicator(
-                  color: const Color(0xFFE9524A),
-                  onRefresh: _loadArchiveSessions,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
-                    children: [
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // 정렬 버튼
+            Padding(
+              padding: const EdgeInsets.fromLTRB(19, 8, 19, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Text(
+                    '최신순',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF606C80),
+                      height: 1.17,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: '새로고침',
+                    onPressed: _loadArchiveSessions,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF606C80)),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: const Color(0xFFE9524A),
+                onRefresh: _loadArchiveSessions,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(19, 0, 19, 20),
+                  children: [
+                    if (_archiveErrorMessage != null) ...[
                       Container(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x14000000),
-                              blurRadius: 18,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
+                          color: const Color(0xFFFFF2EF),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFFFD1C6)),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFEEE9),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(
-                                Icons.inventory_2_outlined,
-                                color: Color(0xFFE9524A),
+                            const Text(
+                              '목록을 불러오지 못했어요.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF9D3F30),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    '대화 보관함',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    hasSessions
-                                        ? '총 ${_archiveSessions.length}개의 대화가 저장되어 있어요.'
-                                        : '저장된 대화를 여기에서 다시 확인할 수 있어요.',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      height: 1.45,
-                                      color: Colors.black.withValues(
-                                        alpha: 0.58,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            const SizedBox(height: 6),
+                            Text(
+                              _archiveErrorMessage!,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                height: 1.45,
+                                color: Color(0xFF7A4A42),
                               ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: _loadArchiveSessions,
+                              child: const Text('다시 시도'),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 14),
-                      if (_archiveErrorMessage != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF2EF),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFFFFD1C6)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '목록을 불러오지 못했어요.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF9D3F30),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _archiveErrorMessage!,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  height: 1.45,
-                                  color: Color(0xFF7A4A42),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              TextButton(
-                                onPressed: _loadArchiveSessions,
-                                child: const Text('다시 시도'),
-                              ),
-                            ],
+                    ],
+                    if (_isLoadingArchive && !hasSessions) ...[
+                      const SizedBox(height: 64),
+                      const Center(child: CircularProgressIndicator()),
+                      const SizedBox(height: 12),
+                      const Center(
+                        child: Text(
+                          '보관된 대화를 불러오는 중이에요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF606C80),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                      ],
-                      if (_isLoadingArchive && !hasSessions) ...[
-                        const SizedBox(height: 64),
-                        const Center(child: CircularProgressIndicator()),
+                      ),
+                    ] else if (!hasSessions) ...[
+                      _buildArchiveEmptyState(),
+                    ] else ...[
+                      for (final session in _archiveSessions) ...[
+                        _buildArchiveSessionCard(session),
                         const SizedBox(height: 12),
-                        const Center(
-                          child: Text(
-                            '보관된 대화를 불러오는 중이에요.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF7A706C),
-                            ),
-                          ),
-                        ),
-                      ] else if (!hasSessions) ...[
-                        _buildArchiveEmptyState(),
-                      ] else ...[
-                        for (final session in _archiveSessions) ...[
-                          _buildArchiveSessionCard(session),
-                          const SizedBox(height: 12),
-                        ],
                       ],
                     ],
-                  ),
+                  ],
                 ),
               ),
-              if (!widget.hideBottomNav) _buildPrimaryNavigation(),
-            ],
-          ),
+            ),
+            // 하단 안내 문구
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF606C80)),
+                  SizedBox(width: 4),
+                  Text(
+                    '채팅 기록은 최대 3년까지 보관할 수 있어요.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF606C80),
+                      height: 1.17,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!widget.hideBottomNav) _buildPrimaryNavigation(),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildArchiveEmptyState() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
+    return SizedBox(
+      height: 300,
       child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFEEE9),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Icon(
-              Icons.chat_bubble_outline_rounded,
-              size: 28,
-              color: Color(0xFFE9524A),
-            ),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            '아직 저장된 대화가 없어요.',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.chat_bubble_outline_rounded, size: 64, color: Color(0xFFD9D9D9)),
+          SizedBox(height: 12),
           Text(
-            '새로 대화를 시작하면 제목과 한줄 요약이 자동으로 보관돼요.',
+            '보관된 채팅이 없어요.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 11.5,
-              height: 1.5,
-              color: Colors.black.withValues(alpha: 0.56),
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF212121),
+              height: 1.125,
             ),
-          ),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: _openChatHome,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE9524A),
-            ),
-            child: const Text('새 대화 시작'),
           ),
         ],
       ),
@@ -2243,95 +2185,84 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildArchiveSessionCard(ArchiveSessionSummary session) {
-    return InkWell(
+    return GestureDetector(
       onTap: () => _showArchiveSessionDetail(session),
-      borderRadius: BorderRadius.circular(24),
-      child: Ink(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Container(
+        padding: const EdgeInsets.all(19),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFF0DDD7)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 16,
-              offset: Offset(0, 8),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(22),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 제목 + 날짜
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFEEE9),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
+                Expanded(
                   child: Text(
-                    _archiveStatusLabel(session.status),
+                    session.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFE9524A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF212121),
+                      height: 1.43,
                     ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Text(
                   _formatArchiveTimestamp(session.lastMessageAt),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 10,
-                    color: Colors.black.withValues(alpha: 0.42),
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF999999),
+                    height: 1.2,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              session.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF231E1D),
-              ),
+            // AI 요약 라벨
+            Row(
+              children: [
+                Image.asset(
+                  'assets/icon/AI.png',
+                  width: 16,
+                  height: 16,
+                  errorBuilder: (context, error, _) => const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 16,
+                    color: Color(0xFF606C80),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'AI 요약',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF606C80),
+                    height: 1.17,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
+            // 요약 내용
             Text(
               session.summary,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
-                height: 1.5,
-                color: Colors.black.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF5D5B5B),
+                height: 1.33,
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  '대화 다시 보기',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black.withValues(alpha: 0.58),
-                  ),
-                ),
-                const Spacer(),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.black.withValues(alpha: 0.36),
-                ),
-              ],
             ),
           ],
         ),
@@ -2342,34 +2273,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildWelcomeScreen() {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFFBF8),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text(
-          'ChatThinQ',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        automaticallyImplyLeading: false,
+        titleSpacing: 19,
+        title: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD9D9D9),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'ChatThinQ',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF212121),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              tooltip: '연결 설정',
-              onPressed: _openSettings,
-              icon: const Icon(Icons.tune_rounded, size: 20),
-            ),
-          ),
-        ],
       ),
       backgroundColor: const Color(0xFFFCEDEB),
       body: Stack(
@@ -2417,146 +2346,128 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
           ),
           SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF6A57),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'NEW',
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(19, 0, 19, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        // 인삿말 섹션
+                        const Text(
+                          '수현님 점심엔 쉬어가요',
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.4,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF212121),
+                            height: 1.44,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'AS와 문제 진단으로 고통 받았던\n당신만을 위한 새로운 해결사',
-                        style: TextStyle(
-                          fontSize: 18,
-                          height: 1.34,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF231E1D),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '생성형 AI를 활용한 스마트홈 어시스턴트로\n더 넓고 자유로운 일상의 대화를 경험해보세요!',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF5D5B5B),
+                            height: 1.43,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
+                        const SizedBox(height: 48),
+                        // NEW 배지
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE95744),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'AS와 문제 진단으로 고통 받았던\n당신만을 위한 새로운 해결사',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF212121),
+                            height: 1.44,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // 카드
+                        GestureDetector(
                           onTap: _openChatHome,
-                          borderRadius: BorderRadius.circular(38),
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(22, 0, 0, 0),
+                            height: 125,
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(38),
-                              border: Border.all(
-                                color: const Color(0xFFF0E2DE),
-                                width: 1.2,
-                              ),
+                              borderRadius: BorderRadius.circular(36),
                               boxShadow: const [
                                 BoxShadow(
-                                  color: Color(0x22000000),
-                                  blurRadius: 24,
-                                  offset: Offset(0, 10),
+                                  color: Color(0x0D000000),
+                                  blurRadius: 12,
                                 ),
                               ],
                             ),
-                            child: SizedBox(
-                              height: 150,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(36),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: 5,
-                                        bottom: 10,
-                                        right: 8,
-                                      ),
+                                      padding: const EdgeInsets.only(left: 19, top: 16, bottom: 16),
                                       child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          const SizedBox(height: 18),
                                           const Text(
                                             '제품과 관련된 질문은\n저에게 물어보세요!',
                                             style: TextStyle(
-                                              fontSize: 13,
-                                              height: 1.35,
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFF231E1D),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF212121),
+                                              height: 1.43,
                                             ),
                                           ),
-                                          const SizedBox(height: 10),
-                                          FilledButton(
-                                            onPressed: _openChatHome,
-                                            style: FilledButton.styleFrom(
-                                              elevation: 0,
-                                              backgroundColor: const Color(
-                                                0xFFD6D9FF,
-                                              ),
-                                              foregroundColor:
-                                                  const Color.fromARGB(
-                                                    255,
-                                                    89,
-                                                    101,
-                                                    211,
-                                                  ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 13,
-                                                    vertical: 13,
-                                                  ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
-                                              ),
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFD6DBFC),
+                                              borderRadius: BorderRadius.circular(100),
                                             ),
                                             child: const Text(
                                               'Chat REBO 사용하기',
                                               style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color(0xFF4D57B9),
+                                                height: 1.17,
                                               ),
                                             ),
                                           ),
-                                          const Spacer(),
                                         ],
                                       ),
                                     ),
                                   ),
                                   SizedBox(
-                                    width: 172,
-                                    child: Align(
+                                    width: 167,
+                                    height: 125,
+                                    child: Image.asset(
+                                      _characterAssetForMode(AssistantMode.maincharacter),
+                                      fit: BoxFit.cover,
                                       alignment: Alignment.bottomRight,
-                                      child: SizedBox(
-                                        width: 172,
-                                        height: 150,
-                                        child: Image.asset(
-                                          _characterAssetForMode(
-                                            AssistantMode.maincharacter,
-                                          ),
-                                          fit: BoxFit.fitHeight,
-                                          alignment: Alignment.bottomRight,
-                                        ),
-                                      ),
                                     ),
                                   ),
                                 ],
@@ -2564,87 +2475,102 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             ),
                           ),
                         ),
-                      ),
-                      const Spacer(),
-                      Center(
-                        child: Text(
-                          'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            color: Colors.black.withValues(alpha: 0.34),
+                        const Spacer(),
+                        // AI 면책 문구
+                        Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'AI가 생성한 응답은 부정확할 수 있습니다.',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Color(0xFF5D5B5B), height: 1.17),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                '더보기',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: Color(0xFF5D5B5B),
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Color(0xFF5D5B5B),
+                                  height: 1.17,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildWelcomeComposer(),
-                      const SizedBox(height: 10),
-                    ],
+                        _buildWelcomeComposer(),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (!widget.hideBottomNav) _buildPrimaryNavigation(),
-            ],
+                if (!widget.hideBottomNav) _buildPrimaryNavigation(),
+              ],
+            ),
           ),
-        ),
         ],
       ),
     );
   }
 
   Widget _buildWelcomeComposer() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12000000),
-            blurRadius: 14,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF4F0),
-              borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      height: 48,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x12000000),
+              blurRadius: 16,
+              offset: Offset(0, 8),
             ),
-            child: Icon(
-              Icons.add_rounded,
-              size: 20,
-              color: Colors.black.withValues(alpha: 0.34),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '텍스트를 입력해주세요',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: Colors.black.withValues(alpha: 0.36),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4F0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.add_rounded,
+                size: 20,
+                color: Colors.black.withValues(alpha: 0.34),
               ),
             ),
-          ),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF4F0),
-              borderRadius: BorderRadius.circular(12),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '메시지를 입력하세요',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: const Color(0xFF5D5B5B).withValues(alpha: 0.70),
+                ),
+              ),
             ),
-            child: Icon(
-              Icons.mic_none_rounded,
-              size: 18,
-              color: Colors.black.withValues(alpha: 0.34),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF4F0),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                Icons.mic_none_rounded,
+                size: 20,
+                color: Colors.black.withValues(alpha: 0.34),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -3324,9 +3250,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
     String? imagePath,
     String? imageName,
   }) {
-    final bubbleColor = isUser
-        ? Colors.white.withValues(alpha: 0.70)
-        : Colors.white;
     final foreground = isUser ? const Color(0xFF5D5B5B) : const Color(0xFF312726);
     final displayMessage = isUser && imagePath != null
         ? _stripDisplayedImageAttachmentLine(message)
@@ -3343,115 +3266,45 @@ class _MobileHomePageState extends State<MobileHomePage> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
         child: Column(
-          crossAxisAlignment: isUser
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
+          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isUser ? '고객' : 'AI',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.black.withValues(alpha: 0.42),
-                      fontWeight: FontWeight.w700,
+            if (isUser && imagePath != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(
+                  File(imagePath),
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            if (displayMessage.isNotEmpty)
+              if (isUser)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
+                      bottomLeft: Radius.circular(10),
                     ),
                   ),
-                  if (!isUser) ...[
-                    const SizedBox(width: 4),
-                    InkWell(
-                      onTap: () => _speakText(message),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: Icon(
-                          Icons.volume_up_rounded,
-                          size: 16,
-                          color: Colors.black.withValues(alpha: 0.42),
-                        ),
+                  child: Text.rich(
+                    TextSpan(
+                      children: _buildMessageTextSpans(
+                        message: displayMessage,
+                        baseStyle: baseTextStyle,
                       ),
                     ),
-                  ],
-                ],
-              ),
-            ),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isUser ? 12 : 14,
-                vertical: isUser ? 10 : 12,
-              ),
-              decoration: BoxDecoration(
-                color: bubbleColor,
-                borderRadius: isUser
-                    ? const BorderRadius.only(
-                        topLeft: Radius.circular(10),
-                        topRight: Radius.circular(10),
-                        bottomLeft: Radius.circular(10),
-                      )
-                    : const BorderRadius.only(
-                        topLeft: Radius.circular(22),
-                        topRight: Radius.circular(22),
-                        bottomRight: Radius.circular(22),
-                        bottomLeft: Radius.circular(8),
-                      ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x12000000),
-                    blurRadius: 10,
-                    offset: Offset(0, 6),
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isUser && imagePath != null) ...[
-                    Container(
-                      width: 74,
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 58,
-                            height: 58,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.22),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                File(imagePath),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            imageName ?? '첨부 이미지',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 9.8,
-                              height: 1.2,
-                              color: Colors.white.withValues(alpha: 0.82),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (displayMessage.isNotEmpty) const SizedBox(height: 10),
-                  ],
-                  if (displayMessage.isNotEmpty)
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text.rich(
                       TextSpan(
                         children: _buildMessageTextSpans(
@@ -3460,9 +3313,25 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         ),
                       ),
                     ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: () {
+                        if (_autoSpeak) {
+                          _stopSpeaking();
+                          setState(() => _autoSpeak = false);
+                        } else {
+                          setState(() => _autoSpeak = true);
+                          _speakText(message);
+                        }
+                      },
+                      child: Icon(
+                        _autoSpeak ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                        size: 18,
+                        color: const Color(0xFF212121).withValues(alpha: 0.40),
+                      ),
+                    ),
+                  ],
+                ),
           ],
         ),
       ),
@@ -4561,7 +4430,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final showMicAction = !_canSend && !_isSubmitting;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(19, 8, 19, 12),
       child: SafeArea(
         top: false,
         child: Column(
@@ -4577,7 +4446,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ),
             _isRecordingActive
                 ? _buildRecordingComposer()
-                : Container(
+                : SizedBox(
+                    height: 48,
+                    child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
                       vertical: 6,
@@ -4594,7 +4465,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       ],
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Container(
                           width: 36,
@@ -4624,11 +4495,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             minLines: 1,
                             maxLines: 4,
                             style: const TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 16,
                               height: 1.45,
                             ),
                             decoration: InputDecoration(
                               hintText: _modePresentation.hintText,
+                              hintStyle: TextStyle(
+                                fontSize: 16,
+                                color: const Color(0xFF5D5B5B).withValues(alpha: 0.70),
+                              ),
                               filled: false,
                               fillColor: Colors.transparent,
                               isDense: true,
@@ -4682,6 +4557,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         ),
                       ],
                     ),
+                  ),
                   ),
           ],
         ),
@@ -4928,8 +4804,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     'AI가 생성한 응답은 부정확할 수 있습니다.',
                     style: TextStyle(
                       color: Color(0xFF5D5B5B),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w400,
+                      height: 1.17,
                     ),
                   ),
                   SizedBox(width: 4),
@@ -4937,9 +4814,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     '더보기',
                     style: TextStyle(
                       color: Color(0xFF5D5B5B),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w400,
                       decoration: TextDecoration.underline,
+                      decorationColor: Color(0xFF5D5B5B),
+                      height: 1.17,
                     ),
                   ),
                 ],
@@ -5180,23 +5059,25 @@ class _AttachmentQuickAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFF3F0EE),
-      borderRadius: BorderRadius.circular(16),
+      color: const Color(0xFFF7F7F7),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 22, color: const Color(0xFF231E1D)),
-              const SizedBox(height: 8),
+              Icon(icon, size: 24, color: const Color(0xFF5D5B5B)),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF5D5B5B),
+                  height: 1.2,
                 ),
               ),
             ],
