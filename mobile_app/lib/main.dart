@@ -2322,10 +2322,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             const Text(
               '채팅 보관함',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF212121),
-                height: 1.11,
+                height: 1.2,
               ),
             ),
             const SizedBox(width: 24),
@@ -4006,10 +4006,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
     '와인셀러',
   ];
 
-  bool _isAfterCategoryOrSerial(String userMsg) {
-    if (userMsg.startsWith('시리얼 넘버:')) return true;
-    return _asCategories.any((cat) => userMsg.trim() == cat);
-  }
+  // bool _isAfterCategoryOrSerial(String userMsg) {
+  //   if (userMsg.startsWith('시리얼 넘버:')) return true;
+  //   return _asCategories.any((cat) => userMsg.trim() == cat);
+  // }
 
   static const _asRequestKeywords = [
     'as',
@@ -4654,17 +4654,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ),
               ] else ...[
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 7,
+                  runSpacing: 7,
                   children: [
                     _buildSuggestionChip(
                       '세부 카테고리 선택',
                       onTap: _showCategorySheet,
                     ),
-                    _buildSuggestionChip(
-                      '시리얼 넘버(S/N) 찾기',
-                      onTap: _showSerialNumberSheet,
-                    ),
+                    // _buildSuggestionChip(
+                    //   '시리얼 넘버(S/N) 찾기',
+                    //   onTap: _showSerialNumberSheet,
+                    // ),
                   ],
                 ),
               ],

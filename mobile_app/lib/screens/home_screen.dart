@@ -23,27 +23,23 @@ class HomeScreen extends StatelessWidget {
                 const Text(
                   '김수현 홈',
                   style: TextStyle(
-                    color: Color(0xFF999999),
+                    color: Color(0xFF212121),
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     fontFamily: 'Pretendard',
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Color(0xFF999999),
-                  size: 20,
-                ),
+                Image.asset('assets/icon/k.png', width: 20, height: 20),
               ],
             ),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.search, color: Color(0xFF212121), size: 24),
+                Image.asset('assets/icon/1.png', width: 24, height: 24),
                 SizedBox(width: 8),
-                Icon(Icons.notifications_none, color: Color(0xFF212121), size: 24),
+                Image.asset('assets/icon/bell.png', width: 24, height: 24),
                 SizedBox(width: 8),
-                Icon(Icons.settings_outlined, color: Color(0xFF212121), size: 24),
+                Image.asset('assets/icon/meatbell.png', width: 24, height: 24),
               ],
             ),
           ],
@@ -94,41 +90,50 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(19, 0, 19, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 10),
-            // Section 1: Banner cards
-            _buildBannerCard(
-              title: '에어컨 사전 점검 서비스로\n올 여름도 시원하게',
-              buttonLabel: '사전점검 신청하기',
-              onTap: null,
+            padding: const EdgeInsets.fromLTRB(19, 0, 19, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 10),
+                // Section 1: Banner cards
+                _buildBannerCard(
+                  title: '에어컨 사전 점검 서비스로\n올 여름도 시원하게',
+                  buttonLabel: '사전점검 신청하기',
+                  onTap: null,
+                ),
+                const SizedBox(height: 12),
+                _buildBannerCard(
+                  title: 'Chat REBO로 우리집 가전의\n고장을 바로 해결해보세요!',
+                  buttonLabel: 'Chat REBO 사용하기',
+                  onTap: onOpenChatbot,
+                ),
+                const SizedBox(height: 24),
+                // Section 2: 즐겨 찾는 제품
+                _buildSectionHeader(
+                  '즐겨 찾는 제품',
+                  iconAsset: 'assets/icon/edit.png',
+                ),
+                const SizedBox(height: 12),
+                _buildProductGrid(),
+                const SizedBox(height: 24),
+                // Section 3: 스마트 루틴
+                _buildSectionHeader(
+                  '스마트 루틴',
+                  iconAsset: 'assets/icon/Right.png',
+                ),
+                const SizedBox(height: 12),
+                _buildChip('루틴 알아보기'),
+                const SizedBox(height: 24),
+                // Section 4: ThinQ 활용하기
+                _buildSectionHeader(
+                  'ThinQ 활용하기',
+                  iconAsset: 'assets/icon/Right.png',
+                ),
+                const SizedBox(height: 12),
+                _buildThinQCard(),
+              ],
             ),
-            const SizedBox(height: 12),
-            _buildBannerCard(
-              title: 'Chat REBO로 우리집 가전의\n고장을 바로 해결해보세요!',
-              buttonLabel: 'Chat REBO 사용하기',
-              onTap: onOpenChatbot,
-            ),
-            const SizedBox(height: 24),
-            // Section 2: 즐겨 찾는 제품
-            _buildSectionHeader('즐겨 찾는 제품'),
-            const SizedBox(height: 12),
-            _buildProductGrid(),
-            const SizedBox(height: 24),
-            // Section 3: 스마트 루틴
-            _buildSectionHeader('스마트 루틴'),
-            const SizedBox(height: 12),
-            _buildChip('루틴 알아보기'),
-            const SizedBox(height: 24),
-            // Section 4: ThinQ 활용하기
-            _buildSectionHeader('ThinQ 활용하기'),
-            const SizedBox(height: 12),
-            _buildThinQCard(),
-          ],
-        ),
-      ),
+          ),
         ],
       ),
     );
@@ -203,7 +208,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, {required String iconAsset}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -216,7 +221,7 @@ class HomeScreen extends StatelessWidget {
             fontFamily: 'Pretendard',
           ),
         ),
-        const Icon(Icons.add, color: Color(0xFF212121), size: 24),
+        Image.asset(iconAsset, width: 24, height: 24),
       ],
     );
   }
@@ -254,11 +259,7 @@ class HomeScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 20,
-            height: 20,
-            color: const Color(0xFFD9D9D9),
-          ),
+          Container(width: 20, height: 20, color: const Color(0xFFD9D9D9)),
           const SizedBox(width: 6),
           Text(
             label,
@@ -285,11 +286,7 @@ class HomeScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 20,
-            height: 20,
-            color: const Color(0xFFD9D9D9),
-          ),
+          Container(width: 20, height: 20, color: const Color(0xFFD9D9D9)),
           const SizedBox(width: 6),
           Text(
             label,
