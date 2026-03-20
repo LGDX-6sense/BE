@@ -4006,10 +4006,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
     '와인셀러',
   ];
 
-  // bool _isAfterCategoryOrSerial(String userMsg) {
-  //   if (userMsg.startsWith('시리얼 넘버:')) return true;
-  //   return _asCategories.any((cat) => userMsg.trim() == cat);
-  // }
+  bool _isAfterCategoryOrSerial(String userMsg) {
+    final trimmed = userMsg.trim();
+    // 시리얼 입력 흐름 제거
+    // if (trimmed.startsWith('시리얼 넘버:')) return true;
+    return _asCategories.any((cat) => trimmed == cat);
+  }
 
   static const _asRequestKeywords = [
     'as',
@@ -4407,6 +4409,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     );
   }
 
+  /*
   void _showSerialNumberSheet() {
     final controller = TextEditingController();
     showModalBottomSheet<void>(
@@ -4510,6 +4513,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       },
     );
   }
+  */
 
   Widget _buildConversationPanel() {
     return ListView(
