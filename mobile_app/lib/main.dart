@@ -57,13 +57,52 @@ class _MainShellState extends State<MainShell> {
     const activeColor = Color(0xFF212121);
     final inactiveColor = const Color(0xFF212121).withValues(alpha: 0.30);
 
-    final items = <({IconData? icon, String? assetPath, String label})>[
-      (icon: Icons.home_filled, assetPath: null, label: '홈'),
-      (icon: null, assetPath: 'assets/icon/Widget_add.png', label: '디바이스'),
-      (icon: null, assetPath: 'assets/icon/Chat_search.png', label: '챗봇'),
-      (icon: null, assetPath: 'assets/icon/Line_up.png', label: '케어'),
-      (icon: null, assetPath: 'assets/icon/Chart.png', label: '메뉴'),
-    ];
+    final items =
+        <
+          ({
+            IconData? fallbackIcon,
+            String? fallbackAssetPath,
+            String activeAssetPath,
+            String inactiveAssetPath,
+            String label,
+          })
+        >[
+          (
+            fallbackIcon: Icons.home_filled,
+            fallbackAssetPath: null,
+            activeAssetPath: 'assets/icon/home.png',
+            inactiveAssetPath: 'assets/icon/home_un.png',
+            label: '홈',
+          ),
+          (
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/Widget_add.png',
+            activeAssetPath: 'assets/icon/device.png',
+            inactiveAssetPath: 'assets/icon/device_un.png',
+            label: '디바이스',
+          ),
+          (
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/AI.png',
+            activeAssetPath: 'assets/icon/ai_.png',
+            inactiveAssetPath: 'assets/icon/ai_un.png',
+            label: '챗봇',
+          ),
+          (
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/Line_up.png',
+            activeAssetPath: 'assets/icon/care.png',
+            inactiveAssetPath: 'assets/icon/care_un.png',
+            label: '케어',
+          ),
+          (
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/Chart.png',
+            activeAssetPath: 'assets/icon/menu.png',
+            inactiveAssetPath: 'assets/icon/menu_un.png',
+            label: '메뉴',
+          ),
+        ];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
@@ -87,22 +126,13 @@ class _MainShellState extends State<MainShell> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        items[i].assetPath != null
-                            ? Opacity(
-                                opacity: _currentIndex == i ? 1.0 : 0.30,
-                                child: Image.asset(
-                                  items[i].assetPath!,
-                                  width: 18,
-                                  height: 18,
-                                ),
-                              )
-                            : Icon(
-                                items[i].icon,
-                                size: 18,
-                                color: _currentIndex == i
-                                    ? activeColor
-                                    : inactiveColor,
-                              ),
+                        _BottomNavAssetIcon(
+                          active: _currentIndex == i,
+                          activeAssetPath: items[i].activeAssetPath,
+                          inactiveAssetPath: items[i].inactiveAssetPath,
+                          fallbackAssetPath: items[i].fallbackAssetPath,
+                          fallbackIcon: items[i].fallbackIcon,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           items[i].label,
@@ -258,6 +288,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _serverHealthy = false;
   bool _isRecordingVoice = false;
   bool _isRecordingNoise = false;
+  bool _isMicButtonPressed = false;
+  bool _cancelSubmissionRequested = false;
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
   bool _showArchiveScreen = false;
@@ -274,6 +306,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
   DateTime? _recordingStartedAt;
   Duration _recordingElapsed = Duration.zero;
   int _recordingWaveSeed = 0;
+  int _activeSubmissionToken = 0;
+  http.Client? _activeRequestClient;
 
   @override
   void initState() {
@@ -299,6 +333,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _recordingUiTimer?.cancel();
     unawaited(_voiceRecorder.dispose());
     unawaited(_tts.stop());
+    _activeRequestClient?.close();
     super.dispose();
   }
 
@@ -306,6 +341,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _stopSubmittingResponse() async {
+    if (!_isSubmitting) {
+      return;
+    }
+
+    _cancelSubmissionRequested = true;
+    _activeSubmissionToken += 1;
+
+    try {
+      _activeRequestClient?.close();
+    } catch (_) {}
+
+    await _stopSpeaking();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = false;
+      _isMicButtonPressed = false;
+      _errorMessage = null;
+      _serverStatus = '중단됨';
+    });
   }
 
   AssistantMode get _assistantMode {
@@ -402,6 +463,44 @@ class _MobileHomePageState extends State<MobileHomePage> {
       case AssistantMode.maincharacter:
         return 'assets/characters/rebo_Image.png';
     }
+  }
+
+  TextStyle get _composerPlaceholderStyle => TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w500,
+    color: const Color(0xFF6A6764).withValues(alpha: 0.78),
+    height: 1.2,
+  );
+
+  Widget _buildComposerDisclaimer() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Text(
+            'AI가 생성한 응답은 부정확할 수 있습니다.',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6A6764),
+              height: 1.2,
+            ),
+          ),
+          SizedBox(width: 4),
+          Text(
+            '더보기',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6A6764),
+              decoration: TextDecoration.underline,
+              decorationColor: Color(0xFF6A6764),
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _configureTts() async {
@@ -1269,9 +1368,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
     setState(() {
       _isSubmitting = true;
+      _isMicButtonPressed = false;
       _errorMessage = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
     });
+
+    final submissionToken = ++_activeSubmissionToken;
+    final requestClient = http.Client();
+    _activeRequestClient = requestClient;
+    _cancelSubmissionRequested = false;
 
     try {
       final previousHistory = List<ChatTurn>.from(_history);
@@ -1331,9 +1436,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
         );
       }
 
-      final streamed = await request.send().timeout(
-        const Duration(seconds: 90),
-      );
+      final streamed = await requestClient
+          .send(request)
+          .timeout(const Duration(seconds: 90));
       final body = await streamed.stream.bytesToString();
       final decoded = body.isEmpty ? <String, dynamic>{} : jsonDecode(body);
 
@@ -1389,7 +1494,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ]
           : mergedHistory;
 
-      if (!mounted) {
+      if (!mounted || submissionToken != _activeSubmissionToken) {
         return;
       }
 
@@ -1433,14 +1538,30 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return;
       }
 
+      if (_cancelSubmissionRequested ||
+          submissionToken != _activeSubmissionToken) {
+        setState(() {
+          _errorMessage = null;
+          _serverStatus = '중단됨';
+        });
+        return;
+      }
+
       setState(() {
         _serverHealthy = false;
         _serverStatus = '요청 실패';
         _errorMessage = error.toString();
       });
     } finally {
+      requestClient.close();
+      if (identical(_activeRequestClient, requestClient)) {
+        _activeRequestClient = null;
+      }
       if (mounted) {
         setState(() => _isSubmitting = false);
+      }
+      if (submissionToken == _activeSubmissionToken) {
+        _cancelSubmissionRequested = false;
       }
     }
   }
@@ -1915,6 +2036,170 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
   }
 
+  Future<void> _confirmDeleteArchiveSession(
+    ArchiveSessionSummary session,
+  ) async {
+    final shouldDelete = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '이 대화를 보관함에서 삭제할까요?',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF212121),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  session.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF3B3B3B),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  session.summary,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: Colors.black.withValues(alpha: 0.56),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          side: BorderSide(
+                            color: Colors.black.withValues(alpha: 0.12),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          '취소',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF525252),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(true),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          backgroundColor: const Color(0xFFE9524A),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text(
+                          '삭제',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldDelete == true) {
+      await _deleteArchiveSession(session);
+    }
+  }
+
+  Future<void> _deleteArchiveSession(ArchiveSessionSummary session) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse(
+              '$_baseUrl/api/archive/sessions/${session.id}?user_id=$_dbUserId',
+            ),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      final body = response.body.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(response.body);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          body is Map<String, dynamic>
+              ? body['detail']?.toString() ?? response.body
+              : response.body,
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _archiveSessions = _archiveSessions
+            .where((item) => item.id != session.id)
+            .toList();
+        if (_chatSessionId == session.id) {
+          _chatSessionId = null;
+        }
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('보관함에서 삭제했어요.')));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   List<ChatTurn> _restoreChatTurnsFromArchiveMessages(
     List<ArchiveMessage> messages,
   ) {
@@ -2217,6 +2502,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildArchiveSessionCard(ArchiveSessionSummary session) {
     return GestureDetector(
       onTap: () => _showArchiveSessionDetail(session),
+      onLongPress: () => _confirmDeleteArchiveSession(session),
       child: Container(
         padding: const EdgeInsets.all(19),
         decoration: BoxDecoration(
@@ -2521,35 +2807,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
                           ),
                         ),
                         const Spacer(),
-                        // AI 면책 문구
-                        Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'AI가 생성한 응답은 부정확할 수 있습니다.',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF6A6764),
-                                  height: 1.2,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text(
-                                '더보기',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF6A6764),
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: Color(0xFF6A6764),
-                                  height: 1.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        _buildComposerDisclaimer(),
+                        const SizedBox(height: 12),
                         _buildWelcomeComposer(),
                         const SizedBox(height: 12),
                       ],
@@ -2567,9 +2826,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildWelcomeComposer() {
     return SizedBox(
-      height: 44,
+      height: 42,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(28),
@@ -2583,42 +2842,38 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4F0),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.add_rounded,
-                size: 20,
-                color: Colors.black.withValues(alpha: 0.34),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Image.asset(
+                'assets/icon/1.png',
+                width: 18,
+                height: 18,
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '메시지를 입력하세요',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF6A6764).withValues(alpha: 0.78),
-                  height: 1.15,
-                ),
+                _modePresentation.hintText,
+                style: _composerPlaceholderStyle,
               ),
             ),
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4F0),
-                borderRadius: BorderRadius.circular(14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Image.asset(
+                'assets/icon/mic_non.png',
+                width: 18,
+                height: 18,
+                fit: BoxFit.contain,
               ),
-              child: Icon(
-                Icons.mic_none_rounded,
-                size: 20,
-                color: Colors.black.withValues(alpha: 0.34),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 2, right: 6),
+              child: Image.asset(
+                'assets/icon/send_non.png',
+                width: 18,
+                height: 18,
+                fit: BoxFit.contain,
               ),
             ),
           ],
@@ -2723,16 +2978,20 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final items =
         <
           ({
-            IconData? icon,
-            String? assetPath,
+            IconData? fallbackIcon,
+            String? fallbackAssetPath,
+            String activeAssetPath,
+            String inactiveAssetPath,
             String label,
             bool active,
             VoidCallback onTap,
           })
         >[
           (
-            icon: Icons.home_filled,
-            assetPath: null,
+            fallbackIcon: Icons.home_filled,
+            fallbackAssetPath: null,
+            activeAssetPath: 'assets/icon/home.png',
+            inactiveAssetPath: 'assets/icon/home_un.png',
             label: '홈',
             active: _selectedBottomNavIndex == 0,
             onTap: () => setState(() {
@@ -2743,8 +3002,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             }),
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Widget_add.png',
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/Widget_add.png',
+            activeAssetPath: 'assets/icon/device.png',
+            inactiveAssetPath: 'assets/icon/device_un.png',
             label: '디바이스',
             active: _selectedBottomNavIndex == 1,
             onTap: () => setState(() {
@@ -2755,15 +3016,19 @@ class _MobileHomePageState extends State<MobileHomePage> {
             }),
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Chat_search.png',
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/AI.png',
+            activeAssetPath: 'assets/icon/ai.png',
+            inactiveAssetPath: 'assets/icon/ai_un.png',
             label: '챗봇',
             active: _selectedBottomNavIndex == 2,
             onTap: _openChatHome,
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Line_up.png',
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/Line_up.png',
+            activeAssetPath: 'assets/icon/care.png',
+            inactiveAssetPath: 'assets/icon/care_un.png',
             label: '케어',
             active: _selectedBottomNavIndex == 3,
             onTap: () => setState(() {
@@ -2774,8 +3039,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             }),
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Chart.png',
+            fallbackIcon: null,
+            fallbackAssetPath: 'assets/icon/Chart.png',
+            activeAssetPath: 'assets/icon/menu.png',
+            inactiveAssetPath: 'assets/icon/menu_un.png',
             label: '메뉴',
             active: _selectedBottomNavIndex == 4,
             onTap: () => setState(() {
@@ -2809,18 +3076,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        item.assetPath != null
-                            ? _BottomNavAssetIcon(
-                                assetPath: item.assetPath!,
-                                active: item.active,
-                              )
-                            : Icon(
-                                item.icon,
-                                size: 18,
-                                color: item.active
-                                    ? const Color(0xFF1F1B1A)
-                                    : Colors.black.withValues(alpha: 0.42),
-                              ),
+                        _BottomNavAssetIcon(
+                          active: item.active,
+                          activeAssetPath: item.activeAssetPath,
+                          inactiveAssetPath: item.inactiveAssetPath,
+                          fallbackAssetPath: item.fallbackAssetPath,
+                          fallbackIcon: item.fallbackIcon,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           item.label,
@@ -4645,7 +4907,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildComposer() {
     final chips = _buildAttachmentChips();
-    final showMicAction = !_canSend && !_isSubmitting;
+    final canSend = _canSend && !_isSubmitting;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(19, 8, 19, 12),
@@ -4665,11 +4927,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
             _isRecordingActive
                 ? _buildRecordingComposer()
                 : SizedBox(
-                    height: 48,
+                    height: 42,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
-                        vertical: 6,
+                        vertical: 5,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -4685,23 +4947,18 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF4F0),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              tooltip: '첨부 메뉴 열기',
-                              onPressed: _isSubmitting
-                                  ? null
-                                  : _openAttachmentSheet,
-                              padding: EdgeInsets.zero,
-                              icon: Icon(
-                                Icons.add_rounded,
-                                color: _modePresentation.accent,
-                                size: 20,
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _isSubmitting ? null : _openAttachmentSheet,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              child: Image.asset(
+                                'assets/icon/1.png',
+                                width: 18,
+                                height: 18,
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),
@@ -4710,26 +4967,23 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             child: TextField(
                               controller: _messageController,
                               enabled: !_isSubmitting,
+                              textAlignVertical: TextAlignVertical.center,
                               minLines: 1,
                               maxLines: 4,
                               style: const TextStyle(
-                                fontSize: 16,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
                                 height: 1.45,
                               ),
                               decoration: InputDecoration(
                                 hintText: _modePresentation.hintText,
-                                hintStyle: TextStyle(
-                                  fontSize: 16,
-                                  color: const Color(
-                                    0xFF5D5B5B,
-                                  ).withValues(alpha: 0.70),
-                                ),
+                                hintStyle: _composerPlaceholderStyle,
                                 filled: false,
                                 fillColor: Colors.transparent,
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 0,
-                                  vertical: 10,
+                                  vertical: 0,
                                 ),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
@@ -4737,46 +4991,72 @@ class _MobileHomePageState extends State<MobileHomePage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: showMicAction
-                                  ? const Color(0xFFFFF4F0)
-                                  : const Color(0xFFFF937E),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: SizedBox(
-                              width: 36,
-                              height: 36,
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: _isSubmitting
-                                    ? null
-                                    : (showMicAction
-                                          ? _handleMicTap
-                                          : _sendMessage),
-                                icon: _isSubmitting
-                                    ? const SizedBox.square(
-                                        dimension: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Icon(
-                                        showMicAction
-                                            ? Icons.mic_none_rounded
-                                            : Icons.send_rounded,
-                                        size: 18,
-                                        color: showMicAction
-                                            ? Colors.black.withValues(
-                                                alpha: 0.36,
-                                              )
-                                            : Colors.white,
-                                      ),
+                          if (_isSubmitting)
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _stopSubmittingResponse,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 6,
+                                  right: 6,
+                                ),
+                                child: Image.asset(
+                                  'assets/icon/stop.png',
+                                  width: 18,
+                                  height: 18,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            )
+                          else ...[
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTapDown: (_) =>
+                                  setState(() => _isMicButtonPressed = true),
+                              onTapCancel: () {
+                                if (_isMicButtonPressed && mounted) {
+                                  setState(() => _isMicButtonPressed = false);
+                                }
+                              },
+                              onTapUp: (_) {
+                                if (_isMicButtonPressed && mounted) {
+                                  setState(() => _isMicButtonPressed = false);
+                                }
+                              },
+                              onTap: _handleMicTap,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: Image.asset(
+                                  _isMicButtonPressed
+                                      ? 'assets/icon/mic.png'
+                                      : 'assets/icon/mic_non.png',
+                                  width: 18,
+                                  height: 18,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
-                          ),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: canSend ? _sendMessage : null,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 2,
+                                  right: 6,
+                                ),
+                                child: Image.asset(
+                                  canSend
+                                      ? 'assets/icon/send.png'
+                                      : 'assets/icon/send_non.png',
+                                  width: 18,
+                                  height: 18,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -5020,36 +5300,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'AI가 생성한 응답은 부정확할 수 있습니다.',
-                        style: TextStyle(
-                          color: Color(0xFF5D5B5B),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w400,
-                          height: 1.2,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '더보기',
-                        style: TextStyle(
-                          color: Color(0xFF5D5B5B),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          decoration: TextDecoration.underline,
-                          decorationColor: Color(0xFF5D5B5B),
-                          height: 1.17,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
+                _buildComposerDisclaimer(),
+                const SizedBox(height: 7),
                 _buildComposer(),
               ],
             ),
@@ -6000,22 +6252,49 @@ class _ArchiveOutlineIcon extends StatelessWidget {
 }
 
 class _BottomNavAssetIcon extends StatelessWidget {
-  const _BottomNavAssetIcon({required this.assetPath, required this.active});
+  const _BottomNavAssetIcon({
+    required this.activeAssetPath,
+    required this.inactiveAssetPath,
+    required this.active,
+    this.fallbackAssetPath,
+    this.fallbackIcon,
+  });
 
-  final String assetPath;
+  final String activeAssetPath;
+  final String inactiveAssetPath;
   final bool active;
+  final String? fallbackAssetPath;
+  final IconData? fallbackIcon;
 
   @override
   Widget build(BuildContext context) {
+    final assetPath = active ? activeAssetPath : inactiveAssetPath;
+    final fallbackColor = active
+        ? const Color(0xFF1F1B1A)
+        : Colors.black.withValues(alpha: 0.42);
+
     return Image.asset(
       assetPath,
       width: 18,
       height: 18,
       fit: BoxFit.contain,
-      color: active
-          ? const Color(0xFF1F1B1A)
-          : Colors.black.withValues(alpha: 0.42),
-      colorBlendMode: BlendMode.srcIn,
+      errorBuilder: (context, error, stackTrace) {
+        if (fallbackAssetPath != null) {
+          return Opacity(
+            opacity: active ? 1.0 : 0.34,
+            child: Image.asset(
+              fallbackAssetPath!,
+              width: 18,
+              height: 18,
+              fit: BoxFit.contain,
+            ),
+          );
+        }
+        if (fallbackIcon != null) {
+          return Icon(fallbackIcon, size: 18, color: fallbackColor);
+        }
+        return const SizedBox(width: 18, height: 18);
+      },
     );
   }
 }

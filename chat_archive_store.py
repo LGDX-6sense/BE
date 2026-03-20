@@ -256,6 +256,27 @@ def _extract_action_phrase(text: str) -> str:
     combined = _normalize_text(text)
     source = _normalize_text(f"{solution} {combined}")
 
+    if solution and _contains_any(
+        solution.lower(),
+        ("as", "a/s", "예약", "상담사", "출장", "방문"),
+    ):     
+        return ""
+
+    if _contains_any(
+        source.lower(),
+        (
+            "as 예약",
+            "as 신청",
+            "a/s 예약",
+            "a/s 신청",
+            "상담사 연결",
+            "출장 예약",
+            "방문 예약",
+            "예약을 진행",
+        ),
+    ):
+        return ""
+
     mapped_actions = [
         (("호스", "물", "빼"), "호스 안의 물을 빼는 자가진단"),
         (("호스", "연결"), "호스 연결 상태를 확인하는 자가진단"),
@@ -263,6 +284,7 @@ def _extract_action_phrase(text: str) -> str:
         (("문", "닫"), "문 닫힘 상태를 확인하는 자가점검"),
         (("전원", "다시"), "전원을 다시 켜보는 자가점검"),
         (("전원", "꺼"), "전원을 다시 켜보는 자가점검"),
+        (("기본 점검",), "기본 점검 자가진단"),
         (("실외기", "점검"), "실외기 상태를 확인하는 자가점검"),
         (("리모컨", "건전지"), "리모컨 건전지를 확인하는 자가점검"),
         (("배수", "점검"), "배수 상태를 확인하는 자가점검"),
@@ -280,6 +302,17 @@ def _extract_action_phrase(text: str) -> str:
         if cleaned:
             return _truncate(f"{cleaned} 자가점검", 46)
 
+    return ""
+
+
+def _extract_action_phrase_from_history(history: Sequence[Dict[str, str]]) -> str:
+    for turn in reversed(history):
+        assistant_text = _clean_assistant_text(turn.get("assistant", ""))
+        if not assistant_text:
+            continue
+        action = _extract_action_phrase(assistant_text)
+        if action:
+            return action
     return ""
 
 
@@ -352,7 +385,7 @@ def _build_archive_summary(
 ) -> str:
     history_text = _all_history_text(history)
     issue = _extract_issue_phrase(latest_user, latest_assistant, history_text)
-    action = _extract_action_phrase(history_text)
+    action = _extract_action_phrase_from_history(history)
     resolved = _detect_resolved(history_text)
     service_requested = _detect_service_request(history_text, routing_intent, routing_required)
 
@@ -557,6 +590,24 @@ def list_messages(db: Session, *, session_id: int) -> List[ChatMessage]:
         .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
     )
     return list(db.scalars(stmt))
+
+
+def delete_session(
+    db: Session,
+    *,
+    session_id: int,
+    user_id: Optional[int] = None,
+) -> bool:
+    """Delete one archived session and its related messages."""
+    session = db.get(ChatSession, session_id)
+    if session is None:
+        return False
+    if user_id is not None and session.user_id != user_id:
+        return False
+
+    db.delete(session)
+    db.commit()
+    return True
 
 
 def serialize_session(session: ChatSession) -> Dict[str, Any]:

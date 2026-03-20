@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from chat_archive_store import (
     ChatSession,
+    delete_session,
     list_messages,
     list_sessions,
     save_chat_exchange,
@@ -640,6 +641,27 @@ def archive_session_detail(session_id: int) -> Dict[str, Any]:
                 "session": serialize_session(session),
                 "messages": [serialize_message(message) for message in messages],
             }
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.delete("/api/archive/sessions/{session_id}")
+def archive_session_delete(
+    session_id: int,
+    user_id: int = Query(1),
+) -> Dict[str, Any]:
+    """Delete one archive session for the current user."""
+    try:
+        db = get_session_factory()()
+        try:
+            deleted = delete_session(db, session_id=session_id, user_id=user_id)
+            if not deleted:
+                raise HTTPException(status_code=404, detail="Archive session not found.")
+            return {"deleted": True, "session_id": session_id}
         finally:
             db.close()
     except HTTPException:
