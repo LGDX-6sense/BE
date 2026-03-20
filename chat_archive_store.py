@@ -342,19 +342,50 @@ def _build_archive_title(latest_user: str, latest_assistant: str, attachment_nam
     return "새 채팅"
 
 
-def _build_archive_summary(latest_user: str, latest_assistant: str) -> str:
-    symptom = _extract_first_sentence(latest_assistant)
-    solution = _extract_solution_line(latest_assistant)
+def _build_archive_summary(
+    history: Sequence[Dict[str, str]],
+    latest_user: str,
+    latest_assistant: str,
+    *,
+    routing_intent: str,
+    routing_required: bool,
+) -> str:
+    history_text = _all_history_text(history)
+    issue = _extract_issue_phrase(latest_user, latest_assistant, history_text)
+    action = _extract_action_phrase(history_text)
+    resolved = _detect_resolved(history_text)
+    service_requested = _detect_service_request(history_text, routing_intent, routing_required)
 
-    if symptom and solution:
-        return _truncate(f"{symptom} {solution} 안내함.", 120)
-    if solution:
-        return _truncate(f"{solution} 안내함.", 120)
+    if routing_required and routing_intent == "connect_agent":
+        return "상담사 연결이 필요해 상담 연결 단계로 안내드렸어요."
+
+    if routing_required and routing_intent == "book_visit":
+        return "출장 서비스가 필요해 방문 예약 단계로 안내드렸어요."
+
+    if issue and resolved and action:
+        return _truncate(
+            f"{issue} 발생으로 {action}을 추천드렸으며, 점검 후 증상이 해결됐습니다.",
+            120,
+        )
+
+    if issue and service_requested and action:
+        return _truncate(
+            f"{issue}에 관해 진단을 받으시고 {action} 후 AS를 신청하셨어요.",
+            120,
+        )
+
+    if issue and service_requested:
+        return _truncate(f"{issue} 문제로 AS 예약을 도와드렸어요.", 120)
+
+    if issue and action:
+        return _truncate(f"{issue} 증상으로 {action}을 안내드렸어요.", 120)
+
+    symptom = _extract_first_sentence(latest_assistant)
     if symptom:
-        return _truncate(symptom, 120)
+        return _truncate(f"{symptom} 관련 내용을 안내드렸어요.", 120)
     if latest_user:
-        return _truncate(latest_user, 120)
-    return "대화가 시작되었습니다."
+        return _truncate(f"{latest_user} 관련 상담을 진행했어요.", 120)
+    return "대화를 진행했어요."
 
 
 def build_title_and_summary(
@@ -369,20 +400,20 @@ def build_title_and_summary(
     attachment_name = _extract_latest_user_attachment_name(history)
 
     if routing_required and routing_intent == "connect_agent":
-        return (
-            "상담사 연결 요청",
-            "상담사 연결이 필요하다고 판단해 상담 연결 선택 단계로 안내함.",
-        )
+        return ("상담사 연결 요청", "상담사 연결이 필요해 상담 연결 단계로 안내드렸어요.")
 
     if routing_required and routing_intent == "book_visit":
-        return (
-            "출장서비스 예약 요청",
-            "출장서비스 예약이 필요하다고 판단해 방문 예약 선택 단계로 안내함.",
-        )
+        return ("출장서비스 예약 요청", "출장 서비스가 필요해 방문 예약 단계로 안내드렸어요.")
 
     return (
         _build_archive_title(latest_user, latest_assistant, attachment_name),
-        _build_archive_summary(latest_user, latest_assistant),
+        _build_archive_summary(
+            history,
+            latest_user,
+            latest_assistant,
+            routing_intent=routing_intent,
+            routing_required=routing_required,
+        ),
     )
 
 
