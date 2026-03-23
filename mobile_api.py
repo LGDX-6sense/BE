@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import math
 import os
@@ -490,17 +491,14 @@ async def chat(
         )
 
     try:
-        image_path = await save_upload(image)
-        if image_path is not None:
-            temp_paths.append(image_path)
-
-        audio_path = await save_upload(audio)
-        if audio_path is not None:
-            temp_paths.append(audio_path)
-
-        voice_audio_path = await save_upload(voice_audio)
-        if voice_audio_path is not None:
-            temp_paths.append(voice_audio_path)
+        image_path, audio_path, voice_audio_path = await asyncio.gather(
+            save_upload(image),
+            save_upload(audio),
+            save_upload(voice_audio),
+        )
+        for p in (image_path, audio_path, voice_audio_path):
+            if p is not None:
+                temp_paths.append(p)
 
         voice_transcript = ""
         voice_transcription_warning = ""
@@ -708,7 +706,9 @@ async def chat(
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
+        import logging as _logging
+        _logging.getLogger(__name__).error("chat API 오류: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.") from error
     finally:
         cleanup_temp_files(temp_paths)
 

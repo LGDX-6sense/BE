@@ -281,6 +281,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   int _streamingTurnIndex = -1;
   List<String> _streamingWords = [];
   int _streamingWordIndex = 0;
+  Timer? _composerDebounceTimer;
 
   static const _agentStepLabels = [
     '증상 분류 중...',
@@ -313,6 +314,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _recordingUiTimer?.cancel();
     _agentStepTimer?.cancel();
     _streamingTimer?.cancel();
+    _composerDebounceTimer?.cancel();
     unawaited(_voiceRecorder.dispose());
     unawaited(_tts.stop());
     super.dispose();
@@ -369,9 +371,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   void _handleComposerChanged() {
-    if (mounted) {
-      setState(() {});
-    }
+    _composerDebounceTimer?.cancel();
+    _composerDebounceTimer = Timer(const Duration(milliseconds: 80), () {
+      if (mounted) setState(() {});
+    });
   }
 
   AssistantMode get _assistantMode {
