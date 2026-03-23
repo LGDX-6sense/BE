@@ -9,6 +9,17 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# .env / openaiapi.env 자동 로드
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).parent / "openaiapi.env"
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=False)
+    else:
+        load_dotenv(override=False)
+except ImportError:
+    pass
+
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,7 +31,7 @@ from chat_archive_store import (
     serialize_message,
     serialize_session,
 )
-from db import get_database_status, get_session_factory
+from db import create_tables_if_needed, get_database_status, get_session_factory
 from multimodal_agent import (
     DEFAULT_CHUNK_PATH,
     DEFAULT_FULL_DOC_PATH,
@@ -140,6 +151,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Supabase PostgreSQL 테이블 자동 생성 (없을 경우)
+create_tables_if_needed()
 
 
 def parse_history(history_json: str) -> List[Dict[str, str]]:
@@ -477,13 +491,14 @@ async def chat(
 
     try:
         image_path = await save_upload(image)
-        audio_path = await save_upload(audio)
-        voice_audio_path = await save_upload(voice_audio)
-
         if image_path is not None:
             temp_paths.append(image_path)
+
+        audio_path = await save_upload(audio)
         if audio_path is not None:
             temp_paths.append(audio_path)
+
+        voice_audio_path = await save_upload(voice_audio)
         if voice_audio_path is not None:
             temp_paths.append(voice_audio_path)
 
@@ -560,6 +575,90 @@ async def chat(
             top_k=top_k,
             user_name=user_name,
         )
+
+        # 이미지 수집: agent_loop에서 직접 반환한 경로 우선
+        assistant_images: List[str] = []
+        direct_paths = result.get("image_paths", [])
+        for img_url in direct_paths[:2]:
+            if img_url and img_url.strip():
+                assistant_images.append(img_url)
+
+        # 없으면 evidence contexts에서 시도
+        if not assistant_images:
+            contexts = result.get("evidence", {}).get("retrieved_contexts", [])
+            for ctx in contexts:
+                paths = ctx.get("image_paths", [])
+                if paths:
+                    for img_url in paths[:2]:
+                        if img_url and img_url.strip():
+                            assistant_images.append(img_url)
+                    if assistant_images:
+                        break
+            # 그래도 없으면 fetch_images_for_document로 시도
+            if not assistant_images:
+                try:
+                    from supabase_store import fetch_images_for_document
+                    for ctx in contexts[:2]:
+                        ctx_url = ctx.get("url", "")
+                        if ctx_url:
+                            imgs = fetch_images_for_document(url=ctx_url)
+                            if imgs:
+                                assistant_images = imgs[:2]
+                                break
+                except Exception:
+                    pass
+
+        # 에이전트 루프가 특정 액션을 트리거했으면 라우팅으로 변환
+        triggered_action = result.get("triggered_action")
+        agent_steps = result.get("agent_steps", [])
+
+        _action_to_intent = {
+            "initiate_as_booking": "as_request",
+            "connect_human_agent": "connect_agent",
+        }
+        if triggered_action in _action_to_intent:
+            routing_intent = _action_to_intent[triggered_action]
+            updated_history = history + [{"user": user_message, "assistant": ""}]
+            saved_session_id = session_id
+            archive_warning = ""
+            try:
+                db = get_session_factory()()
+                try:
+                    saved_session = save_chat_exchange(
+                        db, session_id=session_id, user_id=user_id,
+                        product_id=product_id, user_message=user_message,
+                        assistant_message="", history=updated_history,
+                        routing_intent=routing_intent, routing_required=True,
+                        image_filename=image.filename if image else None,
+                        audio_filename=audio.filename if audio else None,
+                        voice_filename=voice_audio.filename if voice_audio else None,
+                    )
+                    saved_session_id = saved_session.id
+                finally:
+                    db.close()
+            except Exception as error:
+                archive_warning = str(error)
+
+            return {
+                "assistant_message": "",
+                "assistant_images": [],
+                "evidence": result.get("evidence", {}),
+                "history": updated_history,
+                "session_id": saved_session_id,
+                "archive_warning": archive_warning,
+                "voice_transcript": voice_transcript,
+                "voice_transcription_warning": voice_transcription_warning,
+                "routing_required": True,
+                "routing_intent": routing_intent,
+                "routing_action_hint": triggered_action,
+                "routing_confidence": 1.0,
+                "routing_matched_by": "agent_tool",
+                "agent_steps": agent_steps,
+                "severity_level": result.get("severity_level"),
+                "action_pattern": result.get("action_pattern"),
+                "judgment_steps": result.get("judgment_steps", {}),
+            }
+
         updated_history = history + [{"user": user_message, "assistant": result["response"]}]
         saved_session_id = session_id
         archive_warning = ""
@@ -589,6 +688,7 @@ async def chat(
 
         return {
             "assistant_message": result["response"],
+            "assistant_images": assistant_images,
             "evidence": result.get("evidence", {}),
             "history": updated_history,
             "session_id": saved_session_id,
@@ -600,6 +700,10 @@ async def chat(
             "routing_action_hint": None,
             "routing_confidence": intent_result["confidence"],
             "routing_matched_by": intent_result["matched_by"],
+            "agent_steps": agent_steps,
+            "severity_level": result.get("severity_level"),
+            "action_pattern": result.get("action_pattern"),
+            "judgment_steps": result.get("judgment_steps", {}),
         }
     except HTTPException:
         raise
@@ -646,6 +750,30 @@ def archive_session_detail(session_id: int) -> Dict[str, Any]:
         raise
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/debug/supabase-images")
+def debug_supabase_images(q: str = "에어컨") -> Dict[str, Any]:
+    """Supabase 이미지 URL 조립 확인용 디버그 엔드포인트."""
+    try:
+        from supabase_store import retrieve_chunks_from_supabase, _make_storage_url
+        tokens = q.split()
+        rows = retrieve_chunks_from_supabase(query_tokens=tokens, device_hint="unknown", top_k=3)
+        return {
+            "query": q,
+            "results_count": len(rows),
+            "results": [
+                {
+                    "content_preview": r.get("content_chunk", "")[:80],
+                    "image_urls_raw": r.get("image_urls"),
+                    "image_urls_built": r.get("_image_public_urls", []),
+                }
+                for r in rows
+            ],
+            "sample_url": _make_storage_url("kfSzw80neUPmGLoMB88bMw.jpg"),
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def main() -> None:

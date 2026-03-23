@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import logging
 import math
 import mimetypes
 import os
@@ -12,12 +13,25 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+logger = logging.getLogger(__name__)
+
 from pipeline import PROJECT_ROOT, detect_device, first_existing_path, predict_noise
 
 try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None
+
+try:
+    from pinecone import Pinecone as PineconeClient
+except ImportError:
+    PineconeClient = None
+
+try:
+    from supabase_store import fetch_images_for_document, retrieve_chunks_from_supabase
+except Exception:
+    fetch_images_for_document = None
+    retrieve_chunks_from_supabase = None
 
 
 DEFAULT_AGENT_MODEL = os.getenv("OPENAI_AGENT_MODEL", os.getenv("OPENAI_MODEL", "gpt-4-mini"))
@@ -141,6 +155,7 @@ class RetrievedContext:
     url: str
     content: str
     score: float
+    image_paths: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -536,20 +551,72 @@ def local_retrieve(bundle: AgentEvidenceBundle, top_k: int = DEFAULT_TOP_K) -> L
         if source_id in seen_sources:
             continue
         seen_sources.add(source_id)
+        title = str(record.get("title", ""))
+        url = str(record.get("url", ""))
+        image_paths: List[str] = []
+        if fetch_images_for_document is not None:
+            try:
+                image_paths = fetch_images_for_document(title=title, url=url)
+            except Exception as _e:
+                logger.warning("fetch_images_for_document 실패 (title=%s): %s", title, _e)
+
         contexts.append(
             RetrievedContext(
-                title=str(record.get("title", "")),
+                title=title,
                 device=normalize_record_device(record),
                 category_ko=str(record.get("category_ko", "")),
-                url=str(record.get("url", "")),
+                url=url,
                 content=str(record.get("content_chunk", "")),
                 score=score,
+                image_paths=image_paths,
             )
         )
         if len(contexts) >= top_k:
             break
 
     return contexts
+
+
+def _supabase_or_local_retrieve(bundle: AgentEvidenceBundle, top_k: int = DEFAULT_TOP_K) -> List[RetrievedContext]:
+    """Try Supabase DB chunk retrieval first, fall back to local JSONL."""
+    if retrieve_chunks_from_supabase is not None:
+        try:
+            query_tokens = extract_priority_tokens(bundle)
+            rows = retrieve_chunks_from_supabase(
+                query_tokens=query_tokens,
+                device_hint=bundle.device_hint,
+                top_k=top_k,
+            )
+            if rows:
+                contexts = []
+                for row in rows:
+                    title = str(row.get("title", "") or "")
+                    category_ko = str(row.get("category_ko", "") or "")
+                    device = str(row.get("device", "") or "")
+                    content = str(row.get("content_chunk", "") or row.get("retrieval_text", "") or "")
+                    source_url = str(row.get("source_id", "") or "")
+                    image_paths = row.get("_image_public_urls", [])
+                    # image_paths가 비어있으면 source_url로 추가 시도
+                    if not image_paths and source_url and fetch_images_for_document is not None:
+                        try:
+                            image_paths = fetch_images_for_document(url=source_url)
+                        except Exception:
+                            pass
+                    contexts.append(
+                        RetrievedContext(
+                            title=title,
+                            device=normalize_record_device({"title": title, "category_ko": category_ko, "device": device}),
+                            category_ko=category_ko,
+                            url=source_url,
+                            content=content,
+                            score=0.0,
+                            image_paths=image_paths,
+                        )
+                    )
+                return contexts
+        except Exception as _e:
+            logger.warning("Pinecone retrieve 실패, Supabase 폴백: %s", _e)
+    return local_retrieve(bundle, top_k=top_k)
 
 
 def vector_store_retrieve(bundle: AgentEvidenceBundle, vector_store_id: str, top_k: int = DEFAULT_TOP_K) -> List[RetrievedContext]:
@@ -599,6 +666,52 @@ def vector_store_retrieve(bundle: AgentEvidenceBundle, vector_store_id: str, top
     return contexts
 
 
+def pinecone_retrieve(bundle: AgentEvidenceBundle, pinecone_api_key: str, index_name: str, top_k: int = DEFAULT_TOP_K) -> List[RetrievedContext]:
+    """Retrieve support context from Pinecone using semantic similarity search."""
+    if PineconeClient is None:
+        raise ImportError("Missing required package: pinecone. Install it with `pip install pinecone`.")
+    ensure_openai()
+
+    query = build_search_query(bundle)
+    openai_client = OpenAI()
+    embedding_response = openai_client.embeddings.create(model="text-embedding-3-small", input=[query])
+    query_vector = embedding_response.data[0].embedding
+
+    pc = PineconeClient(api_key=pinecone_api_key)
+    index = pc.Index(index_name)
+    results = index.query(vector=query_vector, top_k=top_k, include_metadata=True)
+
+    contexts: List[RetrievedContext] = []
+    for match in results.get("matches", []):
+        metadata = match.get("metadata", {})
+        title = str(metadata.get("title", ""))
+        device = str(metadata.get("device", ""))
+        category_ko = str(metadata.get("category_ko", ""))
+        url = str(metadata.get("url", ""))
+        content = str(metadata.get("content_chunk", ""))
+
+        image_paths: List[str] = []
+        if fetch_images_for_document is not None:
+            try:
+                image_paths = fetch_images_for_document(title=title, url=url)
+            except Exception as _e:
+                logger.warning("fetch_images_for_document 실패 (title=%s): %s", title, _e)
+
+        contexts.append(
+            RetrievedContext(
+                title=title,
+                device=normalize_record_device({"title": title, "category_ko": category_ko, "device": device}),
+                category_ko=category_ko,
+                url=url,
+                content=content,
+                score=float(match.get("score", 0.0)),
+                image_paths=image_paths,
+            )
+        )
+
+    return contexts
+
+
 def build_context_block(contexts: Sequence[RetrievedContext]) -> str:
     """Format retrieved support context for the final diagnosis prompt."""
     if not contexts:
@@ -623,6 +736,11 @@ def build_context_block(contexts: Sequence[RetrievedContext]) -> str:
 
 def build_evidence_payload(bundle: AgentEvidenceBundle) -> Dict[str, Any]:
     """Convert internal evidence into prompt-friendly JSON."""
+    def _context_dict(ctx: RetrievedContext) -> Dict[str, Any]:
+        d = asdict(ctx)
+        d.pop("image_paths", None)  # AI 프롬프트에 이미지 URL 노출 방지
+        return d
+
     return {
         "user_name": bundle.user_name,
         "user_text": bundle.user_text,
@@ -630,7 +748,7 @@ def build_evidence_payload(bundle: AgentEvidenceBundle) -> Dict[str, Any]:
         "audio": asdict(bundle.audio) if bundle.audio else None,
         "image": asdict(bundle.image) if bundle.image else None,
         "warnings": bundle.warnings,
-        "retrieved_contexts": [asdict(context) for context in bundle.retrieved_contexts],
+        "retrieved_contexts": [_context_dict(ctx) for ctx in bundle.retrieved_contexts],
     }
 
 
@@ -888,7 +1006,8 @@ def classify_response_mode(bundle: AgentEvidenceBundle) -> str:
         input_vector = list(response.data[0].embedding)
         for label, centroid in centroids.items():
             vector_scores[label] = cosine_similarity(input_vector, centroid)
-    except Exception:
+    except Exception as _e:
+        logger.warning("의도 분류 임베딩 실패, 키워드 스코어만 사용: %s", _e)
         vector_scores = vector_scores
 
     diagnosis_score = keyword_scores["diagnosis"] + vector_scores["diagnosis"]
@@ -1086,20 +1205,78 @@ def run_agent(
         warnings=warnings,
     )
 
-    vector_store_id = vector_store_id or os.getenv("OPENAI_VECTOR_STORE_ID")
-    if vector_store_id:
+    # ── AI 에이전트 루프 (ReAct) ──────────────────────────────────────────────
+    try:
+        from agent_loop import run_agent_loop
+        loop_result = run_agent_loop(
+            user_text=user_text,
+            user_name=user_name,
+            device_hint=bundle.device_hint,
+            image_path=image_path or "",
+            audio_path=audio_path or "",
+        )
+
+        # 에이전트가 검색한 이미지를 bundle에 반영
+        if loop_result.image_paths:
+            from multimodal_agent import RetrievedContext
+            bundle.retrieved_contexts = [
+                RetrievedContext(
+                    title="", device=bundle.device_hint,
+                    category_ko="", url="", content="",
+                    score=0.0, image_paths=loop_result.image_paths,
+                )
+            ]
+
+        return {
+            "evidence": build_evidence_payload(bundle),
+            "response": loop_result.final_response,
+            "triggered_action": loop_result.triggered_action,
+            "triggered_reason": loop_result.triggered_reason,
+            "severity_level": loop_result.severity_level,
+            "action_pattern": loop_result.action_pattern,
+            "judgment_steps": loop_result.judgment_steps,
+            "image_paths": loop_result.image_paths,
+            "agent_steps": [
+                {"iteration": s.iteration, "action": s.action, "detail": s.detail}
+                for s in loop_result.steps
+            ],
+        }
+    except Exception as _e:
+        logger.error("agent_loop 실패, 레거시 파이프라인으로 폴백: %s", _e, exc_info=True)
+
+    # ── 레거시 파이프라인 (폴백) ──────────────────────────────────────────────
+    pinecone_api_key = os.getenv("PINECONE_API_KEY", "")
+    pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "lg-support")
+    if pinecone_api_key:
         try:
-            bundle.retrieved_contexts = vector_store_retrieve(bundle, vector_store_id=vector_store_id, top_k=top_k)
+            pinecone_results = pinecone_retrieve(bundle, pinecone_api_key=pinecone_api_key, index_name=pinecone_index_name, top_k=top_k)
+            if pinecone_results:
+                bundle.retrieved_contexts = pinecone_results
+            else:
+                bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
         except Exception:
-            bundle.retrieved_contexts = local_retrieve(bundle, top_k=top_k)
+            bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
     else:
-        bundle.retrieved_contexts = local_retrieve(bundle, top_k=top_k)
+        vector_store_id = vector_store_id or os.getenv("OPENAI_VECTOR_STORE_ID")
+        if vector_store_id:
+            try:
+                bundle.retrieved_contexts = vector_store_retrieve(bundle, vector_store_id=vector_store_id, top_k=top_k)
+            except Exception:
+                bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
+        else:
+            bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
 
     response_text = generate_agent_response(bundle)
 
     return {
         "evidence": build_evidence_payload(bundle),
         "response": response_text,
+        "triggered_action": None,
+        "triggered_reason": "",
+        "severity_level": None,
+        "action_pattern": None,
+        "judgment_steps": {},
+        "agent_steps": [],
     }
 
 

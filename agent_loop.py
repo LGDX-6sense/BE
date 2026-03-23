@@ -12,10 +12,13 @@ AI Agent Loop — ReAct 패턴 (생각 → 행동 → 관찰 → 생각)
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 try:
     from openai import OpenAI
@@ -257,31 +260,31 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
                     content = str(meta.get("content_chunk", ""))
                     if content:
                         texts.append(content[:800])
-                    # 이미지: DB에서 올바른 public_url 조회 (서브폴더 포함)
-                    if not image_paths:
+                    # 이미지: 모든 매치에서 수집 (최대 8개까지)
+                    if len(image_paths) < 8:
                         raw = meta.get("image_urls", "")
                         filenames: List[str] = json.loads(raw) if raw else []
+                        need = 8 - len(image_paths)
                         if filenames:
                             try:
                                 from supabase import create_client as _sc
                                 _sb = _sc(supabase_url, os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""))
-                                _res = _sb.table("support_document_images").select("filename, public_url").in_("filename", filenames[:5]).execute()
+                                _res = _sb.table("support_document_images").select("filename, public_url").in_("filename", filenames[:need]).execute()
                                 _url_map = {r["filename"]: r["public_url"] for r in (_res.data or []) if r.get("public_url")}
-                                for fname in filenames[:2]:
+                                for fname in filenames[:need]:
                                     url = _url_map.get(fname)
-                                    if url:
+                                    if url and url not in image_paths:
                                         image_paths.append(url)
-                            except Exception:
-                                pass
+                            except Exception as _e:
+                                logger.warning("DB 이미지 URL 조회 실패: %s", _e)
                         # fallback: http URL이면 그대로 사용
-                        if not image_paths:
-                            for fname in filenames[:2]:
-                                if fname.startswith("http"):
-                                    image_paths.append(fname)
+                        for fname in filenames[:need]:
+                            if fname.startswith("http") and fname not in image_paths:
+                                image_paths.append(fname)
 
                 return "\n\n---\n\n".join(texts), image_paths
-        except Exception:
-            pass  # Pinecone 실패 시 Supabase 폴백
+        except Exception as _e:
+            logger.warning("Pinecone 검색 실패, Supabase 폴백: %s", _e)
 
     # ── 2차: Supabase 렉시컬 검색 (폴백) ────────────────────────────────────
     try:
@@ -302,7 +305,7 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
             if content:
                 texts.append(content[:800])
             if not image_paths:
-                image_paths = row.get("_image_public_urls", [])[:2]
+                image_paths = row.get("_image_public_urls", [])[:8]
 
         return "\n\n---\n\n".join(texts), image_paths
     except Exception as e:
@@ -331,16 +334,17 @@ def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
             "text": (
                 "아래 텍스트의 각 단계에 이미지를 배치해주세요.\n\n"
                 "규칙:\n"
-                "- 각 이미지를 내용상 가장 연관된 단계 바로 뒤 줄에 [이미지N] 형식으로 삽입\n"
-                "- N은 1부터 시작하는 이미지 번호\n"
-                "- 연관성이 낮은 이미지는 삽입하지 않음\n"
+                "- 가능한 한 많은 이미지를 활용해 각 단계 바로 뒤에 [이미지N] 형식으로 삽입\n"
+                "- N은 1부터 시작하는 이미지 번호 (이미지1, 이미지2 ... 순서 유지)\n"
+                "- 하나의 단계에 여러 이미지가 관련되면 모두 삽입 가능\n"
+                "- 텍스트 단계가 없는 이미지는 텍스트 맨 끝에 배치\n"
                 "- 텍스트 내용·표현은 절대 수정하지 말 것, 마커만 삽입\n\n"
                 f"텍스트:\n{text}"
             ),
         }
     ]
 
-    for i, url in enumerate(image_urls[:3], 1):
+    for i, url in enumerate(image_urls[:8], 1):
         content.append({"type": "text", "text": f"\n이미지{i}:"})
         content.append({"type": "image_url", "image_url": {"url": url, "detail": "low"}})
 
@@ -355,8 +359,9 @@ def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
         if len(result) < len(text) * 0.5:
             return text
         return result
-    except Exception:
-        return text  # vision 실패 시 원본 그대로
+    except Exception as _e:
+        logger.warning("vision 이미지 매핑 실패, 원본 텍스트 반환: %s", _e)
+        return text
 
 
 # ── 메인 에이전트 루프 ────────────────────────────────────────────────────────
@@ -553,8 +558,10 @@ def run_agent_loop(
                     query = args.get("query", user_text)
                     hint = args.get("device_hint", device_hint)
                     result_text, images = _execute_search(query, hint)
-                    if images and not collected_images:
-                        collected_images = images
+                    if images:
+                        for img in images:
+                            if img not in collected_images:
+                                collected_images.append(img)
                     tool_result = result_text
                 else:
                     tool_result = f"알 수 없는 도구: {name}"
@@ -579,7 +586,8 @@ def run_agent_loop(
             max_tokens=800,
         )
         final_text = fallback.choices[0].message.content or "죄송합니다. 답변 생성에 실패했습니다."
-    except Exception:
+    except Exception as _e:
+        logger.error("fallback 응답 생성 실패: %s", _e)
         final_text = "죄송합니다. 일시적인 오류가 발생했습니다. 다시 시도해주세요."
 
     return AgentLoopResult(
