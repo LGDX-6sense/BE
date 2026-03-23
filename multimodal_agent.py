@@ -1218,7 +1218,6 @@ def run_agent(
 
         # 에이전트가 검색한 이미지를 bundle에 반영
         if loop_result.image_paths:
-            from multimodal_agent import RetrievedContext
             bundle.retrieved_contexts = [
                 RetrievedContext(
                     title="", device=bundle.device_hint,
@@ -1254,14 +1253,16 @@ def run_agent(
                 bundle.retrieved_contexts = pinecone_results
             else:
                 bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
-        except Exception:
+        except Exception as _e:
+            logger.warning("레거시 Pinecone retrieve 실패, Supabase 폴백: %s", _e)
             bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
     else:
         vector_store_id = vector_store_id or os.getenv("OPENAI_VECTOR_STORE_ID")
         if vector_store_id:
             try:
                 bundle.retrieved_contexts = vector_store_retrieve(bundle, vector_store_id=vector_store_id, top_k=top_k)
-            except Exception:
+            except Exception as _e:
+                logger.warning("vector_store_retrieve 실패, Supabase 폴백: %s", _e)
                 bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
         else:
             bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)

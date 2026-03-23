@@ -255,6 +255,52 @@ def cleanup_temp_files(paths: List[Path]) -> None:
             continue
 
 
+def _archive_chat(
+    *,
+    session_id,
+    user_id,
+    product_id,
+    user_message: str,
+    assistant_message: str,
+    history,
+    routing_intent: str,
+    routing_required: bool,
+    image=None,
+    audio=None,
+    voice_audio=None,
+    ai_meta=None,
+) -> tuple:
+    """DB에 대화 저장 후 (saved_session_id, warning) 반환."""
+    saved_session_id = session_id
+    warning = ""
+    try:
+        db = get_session_factory()()
+        try:
+            saved = save_chat_exchange(
+                db,
+                session_id=session_id,
+                user_id=user_id,
+                product_id=product_id,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                history=history,
+                routing_intent=routing_intent,
+                routing_required=routing_required,
+                image_filename=image.filename if image else None,
+                audio_filename=audio.filename if audio else None,
+                voice_filename=voice_audio.filename if voice_audio else None,
+                ai_meta=ai_meta,
+            )
+            saved_session_id = saved.id
+        finally:
+            db.close()
+    except Exception as _e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning("대화 저장 실패: %s", _e)
+        warning = str(_e)
+    return saved_session_id, warning
+
+
 def ensure_openai_client() -> None:
     """Validate that the OpenAI SDK and API key are available."""
     if OpenAI is None:
@@ -525,30 +571,12 @@ async def chat(
         intent_result = classify_service_intent(effective_message)
         if intent_result["routing_required"]:
             updated_history = history + [{"user": user_message, "assistant": ""}]
-            saved_session_id = session_id
-            archive_warning = ""
-            try:
-                db = get_session_factory()()
-                try:
-                    saved_session = save_chat_exchange(
-                        db,
-                        session_id=session_id,
-                        user_id=user_id,
-                        product_id=product_id,
-                        user_message=user_message,
-                        assistant_message="",
-                        history=updated_history,
-                        routing_intent=intent_result["intent"],
-                        routing_required=True,
-                        image_filename=image.filename if image else None,
-                        audio_filename=audio.filename if audio else None,
-                        voice_filename=voice_audio.filename if voice_audio else None,
-                    )
-                    saved_session_id = saved_session.id
-                finally:
-                    db.close()
-            except Exception as error:
-                archive_warning = str(error)
+            saved_session_id, archive_warning = _archive_chat(
+                session_id=session_id, user_id=user_id, product_id=product_id,
+                user_message=user_message, assistant_message="",
+                history=updated_history, routing_intent=intent_result["intent"],
+                routing_required=True, image=image, audio=audio, voice_audio=voice_audio,
+            )
 
             return {
                 "assistant_message": "",
@@ -617,25 +645,12 @@ async def chat(
         if triggered_action in _action_to_intent:
             routing_intent = _action_to_intent[triggered_action]
             updated_history = history + [{"user": user_message, "assistant": ""}]
-            saved_session_id = session_id
-            archive_warning = ""
-            try:
-                db = get_session_factory()()
-                try:
-                    saved_session = save_chat_exchange(
-                        db, session_id=session_id, user_id=user_id,
-                        product_id=product_id, user_message=user_message,
-                        assistant_message="", history=updated_history,
-                        routing_intent=routing_intent, routing_required=True,
-                        image_filename=image.filename if image else None,
-                        audio_filename=audio.filename if audio else None,
-                        voice_filename=voice_audio.filename if voice_audio else None,
-                    )
-                    saved_session_id = saved_session.id
-                finally:
-                    db.close()
-            except Exception as error:
-                archive_warning = str(error)
+            saved_session_id, archive_warning = _archive_chat(
+                session_id=session_id, user_id=user_id, product_id=product_id,
+                user_message=user_message, assistant_message="",
+                history=updated_history, routing_intent=routing_intent,
+                routing_required=True, image=image, audio=audio, voice_audio=voice_audio,
+            )
 
             return {
                 "assistant_message": "",
@@ -658,31 +673,13 @@ async def chat(
             }
 
         updated_history = history + [{"user": user_message, "assistant": result["response"]}]
-        saved_session_id = session_id
-        archive_warning = ""
-        try:
-            db = get_session_factory()()
-            try:
-                saved_session = save_chat_exchange(
-                    db,
-                    session_id=session_id,
-                    user_id=user_id,
-                    product_id=product_id,
-                    user_message=user_message,
-                    assistant_message=result["response"],
-                    history=updated_history,
-                    routing_intent="normal_chat",
-                    routing_required=False,
-                    image_filename=image.filename if image else None,
-                    audio_filename=audio.filename if audio else None,
-                    voice_filename=voice_audio.filename if voice_audio else None,
-                    ai_meta={"user_name": user_name} if user_name.strip() else None,
-                )
-                saved_session_id = saved_session.id
-            finally:
-                db.close()
-        except Exception as error:
-            archive_warning = str(error)
+        saved_session_id, archive_warning = _archive_chat(
+            session_id=session_id, user_id=user_id, product_id=product_id,
+            user_message=user_message, assistant_message=result["response"],
+            history=updated_history, routing_intent="normal_chat",
+            routing_required=False, image=image, audio=audio, voice_audio=voice_audio,
+            ai_meta={"user_name": user_name} if user_name.strip() else None,
+        )
 
         return {
             "assistant_message": result["response"],
