@@ -274,6 +274,20 @@ class _MobileHomePageState extends State<MobileHomePage> {
   DateTime? _recordingStartedAt;
   Duration _recordingElapsed = Duration.zero;
   int _recordingWaveSeed = 0;
+  Timer? _agentStepTimer;
+  int _agentStepIndex = 0;
+  Timer? _streamingTimer;
+  String _streamingText = '';
+  int _streamingTurnIndex = -1;
+  List<String> _streamingWords = [];
+  int _streamingWordIndex = 0;
+
+  static const _agentStepLabels = [
+    '증상 분류 중...',
+    '원인 분석 중...',
+    '심각도 판단 중...',
+    '해결책 준비 중...',
+  ];
 
   @override
   void initState() {
@@ -283,7 +297,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _baseUrlController.text = _defaultBaseUrlOverride.isNotEmpty
         ? _defaultBaseUrlOverride
         : (Platform.isAndroid
-              ? 'http://192.168.0.13:8000'
+              ? 'http://192.168.42.240:8000'
               : 'http://127.0.0.1:8000');
     unawaited(_configureTts());
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkConnection());
@@ -297,9 +311,61 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _baseUrlController.dispose();
     _scrollController.dispose();
     _recordingUiTimer?.cancel();
+    _agentStepTimer?.cancel();
+    _streamingTimer?.cancel();
     unawaited(_voiceRecorder.dispose());
     unawaited(_tts.stop());
     super.dispose();
+  }
+
+  void _startTextStreaming(String fullText, int turnIndex) {
+    _streamingTimer?.cancel();
+    _streamingWords = fullText.split(' ');
+    _streamingWordIndex = 0;
+    _streamingText = '';
+    _streamingTurnIndex = turnIndex;
+
+    _streamingTimer = Timer.periodic(const Duration(milliseconds: 42), (_) {
+      if (!mounted) {
+        _streamingTimer?.cancel();
+        return;
+      }
+      if (_streamingWordIndex >= _streamingWords.length) {
+        _streamingTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _streamingTurnIndex = -1;
+            _streamingText = '';
+          });
+        }
+        return;
+      }
+      setState(() {
+        _streamingText +=
+            (_streamingWordIndex == 0 ? '' : ' ') +
+            _streamingWords[_streamingWordIndex];
+        _streamingWordIndex++;
+      });
+    });
+  }
+
+  void _startAgentStepTimer() {
+    _agentStepIndex = 0;
+    _agentStepTimer?.cancel();
+    _agentStepTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      if (!mounted) return;
+      setState(() {
+        if (_agentStepIndex < _agentStepLabels.length - 1) {
+          _agentStepIndex++;
+        }
+      });
+    });
+  }
+
+  void _stopAgentStepTimer() {
+    _agentStepTimer?.cancel();
+    _agentStepTimer = null;
+    _agentStepIndex = 0;
   }
 
   void _handleComposerChanged() {
@@ -346,7 +412,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   bool get _isRecordingActive => _isRecordingVoice || _isRecordingNoise;
 
-   _ModePresentation get _modePresentation {
+  _ModePresentation get _modePresentation {
     switch (_assistantMode) {
       case AssistantMode.audio:
         return const _ModePresentation(
@@ -888,7 +954,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.mic_rounded, size: 24, color: Color(0xFF5D5B5B)),
+                            Icon(
+                              Icons.mic_rounded,
+                              size: 24,
+                              color: Color(0xFF5D5B5B),
+                            ),
                             SizedBox(height: 4),
                             Text(
                               '음성채팅',
@@ -923,7 +993,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.graphic_eq_rounded, size: 24, color: Color(0xFF5D5B5B)),
+                            Icon(
+                              Icons.graphic_eq_rounded,
+                              size: 24,
+                              color: Color(0xFF5D5B5B),
+                            ),
                             SizedBox(height: 4),
                             Text(
                               '소음/진동',
@@ -1257,6 +1331,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _errorMessage = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
     });
+    _startAgentStepTimer();
 
     try {
       final previousHistory = List<ChatTurn>.from(_history);
@@ -1353,21 +1428,52 @@ class _MobileHomePageState extends State<MobileHomePage> {
       final routingRequired = decoded['routing_required'] == true;
       final routingIntent = decoded['routing_intent']?.toString();
       const asRoutingIntents = {'as_request', 'connect_agent', 'book_visit'};
-      final isAsRouting = routingRequired && asRoutingIntents.contains(routingIntent);
+      final isAsRouting =
+          routingRequired && asRoutingIntents.contains(routingIntent);
       final nextRoutingStep = ServiceRoutingStep.none;
 
       // AS 관련 인텐트 → 마지막 턴 assistant를 __AS_ROUTING__으로 교체
       final rawAssistantMessage =
           decoded['assistant_message']?.toString().trim() ??
           (mergedHistory.isNotEmpty ? mergedHistory.last.assistant : '');
-      final assistantMessage =
-          isAsRouting ? '__AS_ROUTING__' : rawAssistantMessage;
-      final shouldSpeak = _autoSpeak && assistantMessage.isNotEmpty && !isAsRouting;
+      final assistantMessage = isAsRouting
+          ? '__AS_ROUTING__'
+          : rawAssistantMessage;
+      final shouldSpeak =
+          _autoSpeak && assistantMessage.isNotEmpty && !isAsRouting;
+
+      final rawAssistantImages = decoded['assistant_images'];
+      final assistantImages = (rawAssistantImages is List)
+          ? rawAssistantImages.map((e) => e.toString()).toList()
+          : <String>[];
+
+      final rawSeverityLevel = decoded['severity_level'];
+      final severityLevel = rawSeverityLevel is num
+          ? rawSeverityLevel.toInt()
+          : null;
+      final actionPattern = decoded['action_pattern']?.toString();
+      final rawAgentSteps = decoded['agent_steps'];
+      final agentSteps = (rawAgentSteps is List)
+          ? rawAgentSteps
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+          : <Map<String, dynamic>>[];
 
       final finalHistory = isAsRouting && mergedHistory.isNotEmpty
           ? [
               ...mergedHistory.sublist(0, mergedHistory.length - 1),
               mergedHistory.last.copyWith(assistant: '__AS_ROUTING__'),
+            ]
+          : mergedHistory.isNotEmpty
+          ? [
+              ...mergedHistory.sublist(0, mergedHistory.length - 1),
+              mergedHistory.last.copyWith(
+                assistantImages: assistantImages,
+                severityLevel: severityLevel,
+                actionPattern: actionPattern,
+                agentSteps: agentSteps,
+              ),
             ]
           : mergedHistory;
 
@@ -1407,6 +1513,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
         }
       });
 
+      // 일반 응답일 때 텍스트 스트리밍 시뮬레이션 시작
+      if (!isAsRouting &&
+          assistantMessage.isNotEmpty &&
+          finalHistory.isNotEmpty) {
+        _startTextStreaming(assistantMessage, finalHistory.length - 1);
+      }
+
       if (shouldSpeak) {
         unawaited(_speakText(assistantMessage));
       }
@@ -1422,6 +1535,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       });
     } finally {
       if (mounted) {
+        _stopAgentStepTimer();
         setState(() => _isSubmitting = false);
       }
     }
@@ -2417,176 +2531,178 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
           ),
           SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF6A57),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'NEW',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.4,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF6A57),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.4,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'AS와 문제 진단으로 고통 받았던\n당신만을 위한 새로운 해결사',
-                        style: TextStyle(
-                          fontSize: 18,
-                          height: 1.34,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF231E1D),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'AS와 문제 진단으로 고통 받았던\n당신만을 위한 새로운 해결사',
+                          style: TextStyle(
+                            fontSize: 18,
+                            height: 1.34,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF231E1D),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 18),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _openChatHome,
-                          borderRadius: BorderRadius.circular(38),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(22, 0, 0, 0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(38),
-                              border: Border.all(
-                                color: const Color(0xFFF0E2DE),
-                                width: 1.2,
-                              ),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x22000000),
-                                  blurRadius: 24,
-                                  offset: Offset(0, 10),
+                        const SizedBox(height: 18),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _openChatHome,
+                            borderRadius: BorderRadius.circular(38),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(22, 0, 0, 0),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(38),
+                                border: Border.all(
+                                  color: const Color(0xFFF0E2DE),
+                                  width: 1.2,
                                 ),
-                              ],
-                            ),
-                            child: SizedBox(
-                              height: 150,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: 5,
-                                        bottom: 10,
-                                        right: 8,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          const SizedBox(height: 18),
-                                          const Text(
-                                            '제품과 관련된 질문은\n저에게 물어보세요!',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              height: 1.35,
-                                              fontWeight: FontWeight.w800,
-                                              color: Color(0xFF231E1D),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 10),
-                                          FilledButton(
-                                            onPressed: _openChatHome,
-                                            style: FilledButton.styleFrom(
-                                              elevation: 0,
-                                              backgroundColor: const Color(
-                                                0xFFD6D9FF,
-                                              ),
-                                              foregroundColor:
-                                                  const Color.fromARGB(
-                                                    255,
-                                                    89,
-                                                    101,
-                                                    211,
-                                                  ),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 13,
-                                                    vertical: 13,
-                                                  ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              'Chat REBO 사용하기',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 172,
-                                    child: Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: SizedBox(
-                                        width: 172,
-                                        height: 150,
-                                        child: Image.asset(
-                                          _characterAssetForMode(
-                                            AssistantMode.maincharacter,
-                                          ),
-                                          fit: BoxFit.fitHeight,
-                                          alignment: Alignment.bottomRight,
-                                        ),
-                                      ),
-                                    ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x22000000),
+                                    blurRadius: 24,
+                                    offset: Offset(0, 10),
                                   ),
                                 ],
                               ),
+                              child: SizedBox(
+                                height: 150,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 5,
+                                          bottom: 10,
+                                          right: 8,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const SizedBox(height: 18),
+                                            const Text(
+                                              '제품과 관련된 질문은\n저에게 물어보세요!',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                height: 1.35,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF231E1D),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            FilledButton(
+                                              onPressed: _openChatHome,
+                                              style: FilledButton.styleFrom(
+                                                elevation: 0,
+                                                backgroundColor: const Color(
+                                                  0xFFD6D9FF,
+                                                ),
+                                                foregroundColor:
+                                                    const Color.fromARGB(
+                                                      255,
+                                                      89,
+                                                      101,
+                                                      211,
+                                                    ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 13,
+                                                      vertical: 13,
+                                                    ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        999,
+                                                      ),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'Chat REBO 사용하기',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 172,
+                                      child: Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: SizedBox(
+                                          width: 172,
+                                          height: 150,
+                                          child: Image.asset(
+                                            _characterAssetForMode(
+                                              AssistantMode.maincharacter,
+                                            ),
+                                            fit: BoxFit.fitHeight,
+                                            alignment: Alignment.bottomRight,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const Spacer(),
-                      Center(
-                        child: Text(
-                          'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            color: Colors.black.withValues(alpha: 0.34),
+                        const Spacer(),
+                        Center(
+                          child: Text(
+                            'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              color: Colors.black.withValues(alpha: 0.34),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildWelcomeComposer(),
-                      const SizedBox(height: 10),
-                    ],
+                        const SizedBox(height: 10),
+                        _buildWelcomeComposer(),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (!widget.hideBottomNav) _buildPrimaryNavigation(),
-            ],
+                if (!widget.hideBottomNav) _buildPrimaryNavigation(),
+              ],
+            ),
           ),
-        ),
         ],
       ),
     );
@@ -2905,11 +3021,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF937E).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF937E).withValues(alpha: 0.60),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 5),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF7469).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF7469).withValues(alpha: 0.60),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 5),
-                  Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF5555).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF5555).withValues(alpha: 0.60),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -2992,7 +3129,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ? '안녕하세요, $_displayName님!\n고장·AS 전용 상담사 REBO 에요.\n어떤 문제가 궁금하신가요?'
                   : _modePresentation.title,
               style: TextStyle(
-                color: isIdle ? const Color(0xFF212121) : const Color(0xFFFF937E),
+                color: isIdle
+                    ? const Color(0xFF212121)
+                    : const Color(0xFFFF937E),
                 fontSize: isIdle ? 14 : 18,
                 fontWeight: FontWeight.w600,
                 height: 1.44,
@@ -3004,15 +3143,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.70),
                 borderRadius: BorderRadius.circular(100),
-                border: Border.all(
-                  color: const Color(0xFFFF937E),
-                  width: 1.2,
-                ),
+                border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.photo_camera_outlined, size: 13, color: Color(0xFFEB4C4C)),
+                  Icon(
+                    Icons.photo_camera_outlined,
+                    size: 13,
+                    color: Color(0xFFEB4C4C),
+                  ),
                   SizedBox(width: 5),
                   Text(
                     '사진/음성으로 더 정확한 진단이 가능해요',
@@ -3246,7 +3386,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Icon(icon, size: 16, color: const Color(0xFF999999)),
-                          const Icon(Icons.open_in_full_rounded, size: 14, color: Color(0xFF222222)),
+                          const Icon(
+                            Icons.open_in_full_rounded,
+                            size: 14,
+                            color: Color(0xFF222222),
+                          ),
                         ],
                       ),
                       Align(
@@ -3280,7 +3424,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         color: Colors.black.withValues(alpha: 0.42),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        size: 12,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -3292,30 +3440,136 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
 
     if (_selectedAudioName != null) {
-      chips.add(buildAudioCard(
-        name: _selectedAudioName!,
-        icon: Icons.audio_file_rounded,
-        onDelete: () => setState(() { _selectedAudio = null; _selectedAudioName = null; }),
-      ));
+      chips.add(
+        buildAudioCard(
+          name: _selectedAudioName!,
+          icon: Icons.audio_file_rounded,
+          onDelete: () => setState(() {
+            _selectedAudio = null;
+            _selectedAudioName = null;
+          }),
+        ),
+      );
     }
 
     if (_recordedVoiceName != null) {
-      chips.add(buildAudioCard(
-        name: _recordedVoiceName!,
-        icon: Icons.mic_rounded,
-        onDelete: () => setState(() { _recordedVoice = null; _recordedVoiceName = null; }),
-      ));
+      chips.add(
+        buildAudioCard(
+          name: _recordedVoiceName!,
+          icon: Icons.mic_rounded,
+          onDelete: () => setState(() {
+            _recordedVoice = null;
+            _recordedVoiceName = null;
+          }),
+        ),
+      );
     }
 
     if (_recordedNoiseName != null) {
-      chips.add(buildAudioCard(
-        name: _recordedNoiseName!,
-        icon: Icons.graphic_eq_rounded,
-        onDelete: () => setState(() { _recordedNoise = null; _recordedNoiseName = null; }),
-      ));
+      chips.add(
+        buildAudioCard(
+          name: _recordedNoiseName!,
+          icon: Icons.graphic_eq_rounded,
+          onDelete: () => setState(() {
+            _recordedNoise = null;
+            _recordedNoiseName = null;
+          }),
+        ),
+      );
     }
 
     return chips;
+  }
+
+  Widget _buildSeverityBadge(int level) {
+    const data = {
+      1: (
+        emoji: '🟢',
+        label: '자가 해결 가능',
+        bg: Color(0xFFE8F5E9),
+        fg: Color(0xFF2E7D32),
+      ),
+      2: (
+        emoji: '🟡',
+        label: '확인 필요',
+        bg: Color(0xFFFFF9C4),
+        fg: Color(0xFF6D5B00),
+      ),
+      3: (
+        emoji: '🔴',
+        label: '전문가 필요',
+        bg: Color(0xFFFFEBEE),
+        fg: Color(0xFFC62828),
+      ),
+      4: (
+        emoji: '🚨',
+        label: '긴급',
+        bg: Color(0xFFFFCDD2),
+        fg: Color(0xFFB71C1C),
+      ),
+    };
+    final d = data[level];
+    if (d == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: d.bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(d.emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 5),
+          Text(
+            d.label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: d.fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgentStepChips(List<Map<String, dynamic>> steps) {
+    if (steps.isEmpty) return const SizedBox.shrink();
+    const labels = <String, (String, String)>{
+      'search_knowledge_base': ('🔍', '검색'),
+      'ask_user_question': ('❓', '질문'),
+      'initiate_as_booking': ('📅', 'AS 예약'),
+      'connect_human_agent': ('👤', '상담사'),
+      'final_response': ('✅', '판단 완료'),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: steps.map((step) {
+          final action = step['action']?.toString() ?? '';
+          final info = labels[action] ?? ('⚙️', action);
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
+            ),
+            child: Text(
+              '${info.$1} ${info.$2}',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black.withValues(alpha: 0.50),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   Widget _buildBubble(
@@ -3323,11 +3577,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
     required bool isUser,
     String? imagePath,
     String? imageName,
+    List<String> assistantImages = const [],
   }) {
     final bubbleColor = isUser
         ? Colors.white.withValues(alpha: 0.70)
         : Colors.white;
-    final foreground = isUser ? const Color(0xFF5D5B5B) : const Color(0xFF312726);
+    final foreground = isUser
+        ? const Color(0xFF5D5B5B)
+        : const Color(0xFF312726);
     final displayMessage = isUser && imagePath != null
         ? _stripDisplayedImageAttachmentLine(message)
         : message;
@@ -3452,18 +3709,140 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     if (displayMessage.isNotEmpty) const SizedBox(height: 10),
                   ],
                   if (displayMessage.isNotEmpty)
-                    Text.rich(
-                      TextSpan(
-                        children: _buildMessageTextSpans(
-                          message: displayMessage,
-                          baseStyle: baseTextStyle,
-                        ),
-                      ),
+                    ..._buildInlineContent(
+                      displayMessage,
+                      baseStyle: baseTextStyle,
+                      images: (!isUser && assistantImages.isNotEmpty)
+                          ? assistantImages
+                          : [],
                     ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 텍스트를 번호 단계로 파싱해 이미지를 각 단계 뒤에 배치한 위젯 목록 반환
+  List<Widget> _buildInlineContent(
+    String message, {
+    required TextStyle baseStyle,
+    List<String> images = const [],
+  }) {
+    // ── [이미지N] 마커 기반 모드 (Method 1: vision 매핑 결과) ──────────────
+    final markerRegex = RegExp(r'\[이미지(\d+)\]');
+    if (images.isNotEmpty && markerRegex.hasMatch(message)) {
+      final widgets = <Widget>[];
+      // 마커를 구분자로 분리
+      final segments = message.split(markerRegex);
+      final markerMatches = markerRegex.allMatches(message).toList();
+      for (int i = 0; i < segments.length; i++) {
+        final seg = segments[i].trim();
+        if (seg.isNotEmpty) {
+          widgets.add(
+            Text.rich(
+              TextSpan(
+                children: _buildMessageTextSpans(
+                  message: seg,
+                  baseStyle: baseStyle,
+                ),
+              ),
+            ),
+          );
+        }
+        // 이 세그먼트 뒤에 마커가 있으면 해당 이미지 삽입
+        if (i < markerMatches.length) {
+          final imgNum = int.tryParse(markerMatches[i].group(1) ?? '') ?? 0;
+          final imgIdx = imgNum - 1; // 1-indexed → 0-indexed
+          if (imgIdx >= 0 && imgIdx < images.length) {
+            widgets.add(const SizedBox(height: 8));
+            widgets.add(_buildInlineImage(images[imgIdx]));
+            widgets.add(const SizedBox(height: 6));
+          }
+        }
+      }
+      return widgets;
+    }
+
+    // ── 기존 순서 기반 모드 (fallback) ────────────────────────────────────
+    final stepRegex = RegExp(r'(?=\n\d+[.)]\s)', multiLine: true);
+    final parts = message.split(stepRegex);
+
+    if (parts.length <= 1 || images.isEmpty) {
+      return [
+        Text.rich(
+          TextSpan(
+            children: _buildMessageTextSpans(
+              message: message,
+              baseStyle: baseStyle,
+            ),
+          ),
+        ),
+        if (images.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ...images.map((url) => _buildInlineImage(url)),
+        ],
+      ];
+    }
+
+    final widgets = <Widget>[];
+    int imgIndex = 0;
+
+    for (int i = 0; i < parts.length; i++) {
+      final part = parts[i].trim();
+      if (part.isEmpty) continue;
+
+      widgets.add(
+        Text.rich(
+          TextSpan(
+            children: _buildMessageTextSpans(
+              message: part,
+              baseStyle: baseStyle,
+            ),
+          ),
+        ),
+      );
+
+      // 두 번째 단계부터 이미지 삽입 (첫 번째는 intro 텍스트)
+      if (i >= 1 && imgIndex < images.length) {
+        widgets.add(const SizedBox(height: 8));
+        widgets.add(_buildInlineImage(images[imgIndex]));
+        imgIndex++;
+      }
+      if (i < parts.length - 1) widgets.add(const SizedBox(height: 6));
+    }
+
+    return widgets;
+  }
+
+  Widget _buildInlineImage(String url) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          url,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              height: 150,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFFFF937E),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (context, err, stack) => const SizedBox.shrink(),
         ),
       ),
     );
@@ -3732,19 +4111,23 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox.square(
+                    const SizedBox.square(
                       dimension: 14,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    SizedBox(width: 8),
-                    Text(
-                      '답변을 작성중이에요...',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 8),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: Text(
+                        _agentStepLabels[_agentStepIndex],
+                        key: ValueKey(_agentStepIndex),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -3773,16 +4156,35 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   static const _asRequestKeywords = [
-    'as', 'a/s', 'as신청', 'a/s신청', 'as 신청', 'a/s 신청',
-    '서비스신청', '서비스 신청', '수리신청', '수리 신청',
-    '출장신청', '출장 신청', '출장서비스', '출장 서비스',
-    '기사신청', '기사 신청', '방문수리', '방문 수리',
-    '수리요청', '수리 요청', 'as요청', 'as 요청',
+    'as',
+    'a/s',
+    'as신청',
+    'a/s신청',
+    'as 신청',
+    'a/s 신청',
+    '서비스신청',
+    '서비스 신청',
+    '수리신청',
+    '수리 신청',
+    '출장신청',
+    '출장 신청',
+    '출장서비스',
+    '출장 서비스',
+    '기사신청',
+    '기사 신청',
+    '방문수리',
+    '방문 수리',
+    '수리요청',
+    '수리 요청',
+    'as요청',
+    'as 요청',
   ];
 
   bool _isAsRequestMessage(String msg) {
     final normalized = msg.trim().toLowerCase();
-    return _asRequestKeywords.any((kw) => normalized == kw || normalized.contains(kw));
+    return _asRequestKeywords.any(
+      (kw) => normalized == kw || normalized.contains(kw),
+    );
   }
 
   Widget _buildAsRoutingResponse() {
@@ -3856,10 +4258,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(
-                    user: '자가점검',
-                    assistant: '__SELF_CHECK__',
-                  ),
+                  const ChatTurn(user: '자가점검', assistant: '__SELF_CHECK__'),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3875,7 +4274,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(user: '서비스 전문 상담', assistant: '__SERVICE_CONSULT__'),
+                  const ChatTurn(
+                    user: '서비스 전문 상담',
+                    assistant: '__SERVICE_CONSULT__',
+                  ),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3891,7 +4293,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(user: '출장 서비스 예약', assistant: '__VISIT_SERVICE__'),
+                  const ChatTurn(
+                    user: '출장 서비스 예약',
+                    assistant: '__VISIT_SERVICE__',
+                  ),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -4090,7 +4495,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
               children: [
                 const Text(
                   '세부 카테고리 선택',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF212121),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 const Text(
@@ -4107,16 +4516,27 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 4,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
                             child: Text(
                               cat,
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF212121)),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF212121),
+                              ),
                             ),
                           ),
-                          const Icon(Icons.chevron_right, size: 18, color: Color(0xFFFF937E)),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: Color(0xFFFF937E),
+                          ),
                         ],
                       ),
                     ),
@@ -4154,12 +4574,19 @@ class _MobileHomePageState extends State<MobileHomePage> {
               children: [
                 const Text(
                   '시리얼 넘버(S/N) 입력',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF212121),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '제품 뒷면 또는 측면 스티커에서 확인할 수 있어요.',
-                  style: TextStyle(fontSize: 13, color: Colors.black.withValues(alpha: 0.52)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.black.withValues(alpha: 0.52),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -4169,18 +4596,26 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     hintText: 'S/N 번호를 입력하세요',
                     filled: true,
                     fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: Color(0xFFFF937E)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.12)),
+                      borderSide: BorderSide(
+                        color: Colors.black.withValues(alpha: 0.12),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: Color(0xFFFF937E), width: 1.5),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFFF937E),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
@@ -4199,9 +4634,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFFF937E),
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
-                    child: const Text('입력 완료', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    child: const Text(
+                      '입력 완료',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -4214,112 +4657,141 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildConversationPanel() {
     return ListView(
-        controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-        children: [
-          // 새 채팅 유도 배너
-          GestureDetector(
-            onTap: _resetConversation,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF937E).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFF937E).withValues(alpha: 0.25),
-                ),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      children: [
+        // 새 채팅 유도 배너
+        GestureDetector(
+          onTap: _resetConversation,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF937E).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFF937E).withValues(alpha: 0.25),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.add_comment_outlined, size: 16, color: Color(0xFFFF937E)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      '다른 증상을 진단하려면 새 채팅을 시작하세요',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFFFF937E),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const Text(
-                    '새 채팅 →',
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.add_comment_outlined,
+                  size: 16,
+                  color: Color(0xFFFF937E),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '다른 증상을 진단하려면 새 채팅을 시작하세요',
                     style: TextStyle(
                       fontSize: 12,
                       color: Color(0xFFFF937E),
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          for (var index = 0; index < _history.length; index++) ...[
-            _buildBubble(
-              _history[index].user,
-              isUser: true,
-              imagePath: _history[index].userImagePath,
-              imageName: _history[index].userImageName,
-            ),
-            if (_history[index].assistant.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              if (_history[index].assistant == '__AS_ROUTING__') ...[
-                _buildAsRoutingResponse(),
-              ] else if (_history[index].assistant == '__SELF_CHECK__') ...[
-                _buildSelfCheckResponse(),
-              ] else if (_history[index].assistant == '__SERVICE_CONSULT__') ...[
-                _buildServiceConsultResponse(),
-              ] else if (_history[index].assistant == '__VISIT_SERVICE__') ...[
-                _buildVisitServiceResponse(),
-              ] else ...[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Image.asset(
-                    _characterAssetForMode(AssistantMode.idle),
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.contain,
                   ),
                 ),
-                const SizedBox(height: 12),
-                _buildBubble(_history[index].assistant, isUser: false),
+                const Text(
+                  '새 채팅 →',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFFF937E),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
-              // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
-              if (index == _history.length - 1 &&
-                  !_isSubmitting &&
-                  _serviceRoutingStep == ServiceRoutingStep.none &&
-                  _history[index].userImagePath == null &&
-                  _history[index].assistant != '__AS_ROUTING__' &&
-                  _history[index].assistant != '__SELF_CHECK__' &&
-                  _history[index].assistant != '__SERVICE_CONSULT__' &&
-                  _history[index].assistant != '__VISIT_SERVICE__') ...[
-                const SizedBox(height: 12),
-                if (_isAfterCategoryOrSerial(_history[index].user)) ...[
-                  // AS 안내 텍스트
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBF8),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Text(
-                      'AS 신청이 필요하시군요!\n아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF5D5B5B), height: 1.5),
+            ),
+          ),
+        ),
+        for (var index = 0; index < _history.length; index++) ...[
+          _buildBubble(
+            _history[index].user,
+            isUser: true,
+            imagePath: _history[index].userImagePath,
+            imageName: _history[index].userImageName,
+          ),
+          if (_history[index].assistant.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            if (_history[index].assistant == '__AS_ROUTING__') ...[
+              _buildAsRoutingResponse(),
+            ] else if (_history[index].assistant == '__SELF_CHECK__') ...[
+              _buildSelfCheckResponse(),
+            ] else if (_history[index].assistant == '__SERVICE_CONSULT__') ...[
+              _buildServiceConsultResponse(),
+            ] else if (_history[index].assistant == '__VISIT_SERVICE__') ...[
+              _buildVisitServiceResponse(),
+            ] else ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  _characterAssetForMode(AssistantMode.idle),
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_history[index].severityLevel != null) ...[
+                _buildSeverityBadge(_history[index].severityLevel!),
+                const SizedBox(height: 6),
+              ],
+              if (_history[index].agentSteps.isNotEmpty) ...[
+                _buildAgentStepChips(_history[index].agentSteps),
+                const SizedBox(height: 4),
+              ],
+              _buildBubble(
+                index == _streamingTurnIndex
+                    ? '$_streamingText▌'
+                    : _history[index].assistant,
+                isUser: false,
+                assistantImages: index == _streamingTurnIndex
+                    ? const []
+                    : _history[index].assistantImages,
+              ),
+            ],
+            // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
+            if (index == _history.length - 1 &&
+                !_isSubmitting &&
+                _serviceRoutingStep == ServiceRoutingStep.none &&
+                _history[index].userImagePath == null &&
+                _history[index].assistant != '__AS_ROUTING__' &&
+                _history[index].assistant != '__SELF_CHECK__' &&
+                _history[index].assistant != '__SERVICE_CONSULT__' &&
+                _history[index].assistant != '__VISIT_SERVICE__') ...[
+              const SizedBox(height: 12),
+              if (_isAfterCategoryOrSerial(_history[index].user)) ...[
+                // AS 안내 텍스트
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBF8),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    'AS 신청이 필요하시군요!\n아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF5D5B5B),
+                      height: 1.5,
                     ),
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildSuggestionChip('상담사 연결', onTap: () {
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildSuggestionChip(
+                      '상담사 연결',
+                      onTap: () {
                         _messageController.text = '상담사 연결해줘';
                         _sendMessage();
-                      }),
-                      _buildSuggestionChip('A/S 신청', onTap: () {
+                      },
+                    ),
+                    _buildSuggestionChip(
+                      'A/S 신청',
+                      onTap: () {
                         setState(() {
                           _history = [
                             ..._history,
@@ -4336,33 +4808,42 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             curve: Curves.easeOut,
                           );
                         });
-                      }),
-                    ],
-                  ),
-                ] else ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildSuggestionChip('세부 카테고리 선택', onTap: _showCategorySheet),
-                      _buildSuggestionChip('시리얼 넘버(S/N) 찾기', onTap: _showSerialNumberSheet),
-                    ],
-                  ),
-                ],
+                      },
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildSuggestionChip(
+                      '세부 카테고리 선택',
+                      onTap: _showCategorySheet,
+                    ),
+                    _buildSuggestionChip(
+                      '시리얼 넘버(S/N) 찾기',
+                      onTap: _showSerialNumberSheet,
+                    ),
+                  ],
+                ),
               ],
             ],
-            if (index == _history.length - 1 &&
-                _serviceRoutingStep != ServiceRoutingStep.none) ...[
-              const SizedBox(height: 10),
-              _buildServiceRoutingPanel(),
-            ],
-            const SizedBox(height: 14),
           ],
-          if (_isSubmitting)
-            Padding(
-              padding: const EdgeInsets.only(top: 8, left: 4),
-              child: Builder(builder: (context) {
-                final hasImage = _history.isNotEmpty && _history.last.userImagePath != null;
+          if (index == _history.length - 1 &&
+              _serviceRoutingStep != ServiceRoutingStep.none) ...[
+            const SizedBox(height: 10),
+            _buildServiceRoutingPanel(),
+          ],
+          const SizedBox(height: 14),
+        ],
+        if (_isSubmitting)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Builder(
+              builder: (context) {
+                final hasImage =
+                    _history.isNotEmpty && _history.last.userImagePath != null;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4395,8 +4876,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     const SizedBox(height: 16),
                     Text(
                       hasImage
-                          ? '사진을 분석중이에요\n정확한 진단을 위해 조금만 기다려주세요'
-                          : '해결방법을 생각 중이에요\n정확한 진단을 위해 조금만 기다려주세요',
+                          ? '사진을 분석 중이에요\n정확한 진단을 위해 조금만 기다려주세요'
+                          : _agentStepIndex == 0
+                          ? '증상을 분류하고 있어요\n잠시만 기다려주세요'
+                          : _agentStepIndex == 1
+                          ? '원인을 분석하고 있어요\n잠시만 기다려주세요'
+                          : _agentStepIndex == 2
+                          ? '심각도를 판단하고 있어요\n잠시만 기다려주세요'
+                          : '해결책을 준비하고 있어요\n잠시만 기다려주세요',
                       style: const TextStyle(
                         color: Color(0xFFFF937E),
                         fontSize: 18,
@@ -4404,21 +4891,74 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         height: 1.33,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 350),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.3),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: Text(
+                        _agentStepLabels[_agentStepIndex],
+                        key: ValueKey(_agentStepIndex),
+                        style: TextStyle(
+                          color: const Color(
+                            0xFFFF937E,
+                          ).withValues(alpha: 0.70),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF937E).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFF937E,
+                            ).withValues(alpha: 0.60),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 5),
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF7469).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFF7469,
+                            ).withValues(alpha: 0.60),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(width: 5),
-                        Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFFFF5555).withValues(alpha: 0.60), shape: BoxShape.circle)),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFFF5555,
+                            ).withValues(alpha: 0.60),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 );
-              }),
+              },
             ),
-        ],
+          ),
+      ],
     );
   }
 
@@ -4817,7 +5357,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
               onTap: _resetConversation,
               child: Container(
                 margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF937E).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
@@ -4894,62 +5437,62 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
           ),
           SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  _history.isEmpty ? 12 : 4,
-                  16,
-                  0,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      _history.isEmpty ? 12 : 4,
+                      16,
+                      0,
+                    ),
+                    child: Column(
+                      children: [
+                        if (_errorMessage != null) ...[
+                          _buildErrorCard(),
+                          const SizedBox(height: 10),
+                        ],
+                        Expanded(
+                          child: (_isRecordingActive || _history.isEmpty)
+                              ? _buildChatIntroPanel()
+                              : _buildConversationPanel(),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    if (_errorMessage != null) ...[
-                      _buildErrorCard(),
-                      const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'AI가 생성한 응답은 부정확할 수 있습니다.',
+                        style: TextStyle(
+                          color: Color(0xFF5D5B5B),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '더보기',
+                        style: TextStyle(
+                          color: Color(0xFF5D5B5B),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ],
-                    Expanded(
-                      child: (_isRecordingActive || _history.isEmpty)
-                          ? _buildChatIntroPanel()
-                          : _buildConversationPanel(),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                _buildComposer(),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Text(
-                    'AI가 생성한 응답은 부정확할 수 있습니다.',
-                    style: TextStyle(
-                      color: Color(0xFF5D5B5B),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Text(
-                    '더보기',
-                    style: TextStyle(
-                      color: Color(0xFF5D5B5B),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w400,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 4),
-            _buildComposer(),
-          ],
-        ),
-      ),
+          ),
         ],
       ),
     );
@@ -5978,12 +6521,20 @@ class ChatTurn {
     required this.assistant,
     this.userImagePath,
     this.userImageName,
+    this.assistantImages = const [],
+    this.severityLevel,
+    this.actionPattern,
+    this.agentSteps = const [],
   });
 
   final String user;
   final String assistant;
   final String? userImagePath;
   final String? userImageName;
+  final List<String> assistantImages;
+  final int? severityLevel; // 1(자가해결) 2(확인필요) 3(전문가) 4(긴급)
+  final String? actionPattern; // "A" | "B" | "C" | "D"
+  final List<Map<String, dynamic>> agentSteps; // [{iteration, action, detail}]
 
   factory ChatTurn.fromJson(Map<dynamic, dynamic> json) {
     return ChatTurn(
@@ -5999,12 +6550,20 @@ class ChatTurn {
     String? assistant,
     String? userImagePath,
     String? userImageName,
+    List<String>? assistantImages,
+    int? severityLevel,
+    String? actionPattern,
+    List<Map<String, dynamic>>? agentSteps,
   }) {
     return ChatTurn(
       user: user ?? this.user,
       assistant: assistant ?? this.assistant,
       userImagePath: userImagePath ?? this.userImagePath,
       userImageName: userImageName ?? this.userImageName,
+      assistantImages: assistantImages ?? this.assistantImages,
+      severityLevel: severityLevel ?? this.severityLevel,
+      actionPattern: actionPattern ?? this.actionPattern,
+      agentSteps: agentSteps ?? this.agentSteps,
     );
   }
 }

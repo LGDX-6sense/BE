@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -308,6 +309,56 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
         return f"검색 오류: {e}", []
 
 
+# ── 이미지 ↔ 텍스트 매핑 (GPT-4o vision) ────────────────────────────────────
+
+def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
+    """GPT-4o-mini vision으로 이미지를 텍스트 단계에 맞게 [이미지N] 마커로 삽입.
+
+    번호 단계가 없거나 이미지가 없으면 원본 텍스트를 그대로 반환.
+    vision API 실패 시에도 원본 텍스트 반환(안전 폴백).
+    """
+    if not image_urls or not text:
+        return text
+    # 번호 단계가 없으면 vision 매핑 불필요
+    if not re.search(r'\d+[.)]\s', text):
+        return text
+
+    vision_model = os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini")
+
+    content: List[Any] = [
+        {
+            "type": "text",
+            "text": (
+                "아래 텍스트의 각 단계에 이미지를 배치해주세요.\n\n"
+                "규칙:\n"
+                "- 각 이미지를 내용상 가장 연관된 단계 바로 뒤 줄에 [이미지N] 형식으로 삽입\n"
+                "- N은 1부터 시작하는 이미지 번호\n"
+                "- 연관성이 낮은 이미지는 삽입하지 않음\n"
+                "- 텍스트 내용·표현은 절대 수정하지 말 것, 마커만 삽입\n\n"
+                f"텍스트:\n{text}"
+            ),
+        }
+    ]
+
+    for i, url in enumerate(image_urls[:3], 1):
+        content.append({"type": "text", "text": f"\n이미지{i}:"})
+        content.append({"type": "image_url", "image_url": {"url": url, "detail": "low"}})
+
+    try:
+        resp = client.chat.completions.create(
+            model=vision_model,
+            messages=[{"role": "user", "content": content}],
+            max_tokens=2000,
+        )
+        result = (resp.choices[0].message.content or "").strip()
+        # 원본 텍스트 길이의 50% 미만이면 손상된 것으로 판단 → 원본 반환
+        if len(result) < len(text) * 0.5:
+            return text
+        return result
+    except Exception:
+        return text  # vision 실패 시 원본 그대로
+
+
 # ── 메인 에이전트 루프 ────────────────────────────────────────────────────────
 
 def run_agent_loop(
@@ -422,6 +473,9 @@ def run_agent_loop(
         if finish_reason == "stop":
             raw_text = choice.message.content or ""
             final_text, meta = _parse_agent_meta(raw_text)
+            # 이미지가 있으면 vision으로 텍스트 단계에 인라인 배치
+            if collected_images:
+                final_text = _match_images_to_text(final_text, collected_images, client)
             steps.append(AgentStep(iteration=iteration, action="final_response"))
             return AgentLoopResult(
                 final_response=final_text,
