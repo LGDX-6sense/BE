@@ -378,6 +378,7 @@ def run_agent_loop(
     image_summary: str = "",   # 하위 호환성 유지
     audio_summary: str = "",   # 하위 호환성 유지
     max_iterations: int = 6,
+    user_profile_context: str = "",
 ) -> AgentLoopResult:
     """
     ReAct 루프: 생각 → 행동(도구) → 관찰 → 생각 → ... → 최종 답변
@@ -439,6 +440,11 @@ def run_agent_loop(
 {{"severity_level": <1|2|3|4>, "action_pattern": "<A|B|C|D>", "step1": "<증상 분류 요약>", "step2": "<원인 분석 요약>", "step3": "<심각도 판단 근거>"}}
 [[/AGENT_META]]
 """
+
+    # 유저 프로필 정보가 있으면 system prompt에 추가
+    if user_profile_context:
+        system_prompt += f"\n\n## 고객 정보 (DB 등록 정보)\n{user_profile_context}\n"
+        system_prompt += "AS 예약 시 위 주소/연락처를 활용하세요. 등록 제품 모델명을 검색 쿼리에 포함하세요.\n"
 
     # 사용자 메시지 구성
     user_content = user_text

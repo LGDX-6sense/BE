@@ -33,6 +33,7 @@ from chat_archive_store import (
     serialize_session,
 )
 from db import create_tables_if_needed, get_database_status, get_session_factory
+from user_store import UserProfile, get_user_context_string, get_user_profile, serialize_user
 from multimodal_agent import (
     DEFAULT_CHUNK_PATH,
     DEFAULT_FULL_DOC_PATH,
@@ -593,19 +594,40 @@ async def chat(
                 "routing_matched_by": intent_result["matched_by"],
             }
 
+        # 유저 프로필 조회 → agent context 주입
+        user_profile_context = ""
+        resolved_user_name = user_name
+        resolved_device_hint = "unknown"
+        try:
+            db = get_session_factory()()
+            try:
+                profile = get_user_profile(db, user_id)
+                if profile:
+                    resolved_user_name = profile.name
+                    user_profile_context = get_user_context_string(profile)
+                    devices = profile.devices or []
+                    if devices:
+                        resolved_device_hint = devices[0].get("category", "unknown")
+            finally:
+                db.close()
+        except Exception as _e:
+            logger.warning("유저 프로필 조회 실패: %s", _e)
+
         conversation_text = build_conversation_context(history, effective_message)
         result = run_agent(
             user_text=conversation_text,
             image_path=str(image_path) if image_path else None,
             audio_path=str(audio_path) if audio_path else None,
             top_k=top_k,
-            user_name=user_name,
+            user_name=resolved_user_name,
+            device_hint=resolved_device_hint,
+            user_profile_context=user_profile_context,
         )
 
         # 이미지 수집: agent_loop에서 직접 반환한 경로 우선
         assistant_images: List[str] = []
         direct_paths = result.get("image_paths", [])
-        for img_url in direct_paths[:2]:
+        for img_url in direct_paths[:8]:
             if img_url and img_url.strip():
                 assistant_images.append(img_url)
 
@@ -615,7 +637,7 @@ async def chat(
             for ctx in contexts:
                 paths = ctx.get("image_paths", [])
                 if paths:
-                    for img_url in paths[:2]:
+                    for img_url in paths[:8]:
                         if img_url and img_url.strip():
                             assistant_images.append(img_url)
                     if assistant_images:

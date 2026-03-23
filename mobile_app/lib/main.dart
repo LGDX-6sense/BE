@@ -250,8 +250,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _archiveOpenedFromChat = false;
   bool _isLoadingArchive = false;
   int _selectedBottomNavIndex = 0;
-  final int _dbUserId = 1;
-  final String _dbUserName = '지영';
+  int _dbUserId = 3;
+  String _dbUserName = '지영';
+
+  static const _demoUsers = <(int, String)>[
+    (1, '경옥'),
+    (2, '경은'),
+    (3, '지영'),
+    (4, '수현'),
+    (5, '혜민'),
+  ];
   String _serverStatus = '확인 중';
   String? _archiveErrorMessage;
   List<ArchiveSessionSummary> _archiveSessions = const [];
@@ -3213,39 +3221,89 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Future<void> _openSettings() {
     return _showSheet(
       '연결 설정',
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '안드로이드 에뮬레이터는 보통 10.0.2.2, iOS 시뮬레이터는 보통 127.0.0.1을 사용합니다. '
-            '실제 휴대폰에서는 같은 Wi-Fi에 있는 PC의 IP 주소를 입력해주세요.',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
-              height: 1.45,
+      StatefulBuilder(
+        builder: (ctx, setLocal) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 시연 유저 선택
+            Text(
+              '시연 유저',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.60),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _baseUrlController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              fillColor: Colors.white.withValues(alpha: 0.08),
-              hintText: 'http://192.168.0.13:8000',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: DropdownButton<int>(
+                value: _dbUserId,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF2C2C2C),
+                underline: const SizedBox.shrink(),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                items: _demoUsers.map((u) => DropdownMenuItem(
+                  value: u.$1,
+                  child: Text('${u.$2} (ID ${u.$1})'),
+                )).toList(),
+                onChanged: (val) {
+                  if (val == null) return;
+                  final name = _demoUsers.firstWhere((u) => u.$1 == val).$2;
+                  setState(() {
+                    _dbUserId = val;
+                    _dbUserName = name;
+                  });
+                  setLocal(() {});
+                },
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.tonalIcon(
-            onPressed: _isCheckingConnection ? null : _checkConnection,
-            icon: _isCheckingConnection
-                ? const SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.wifi_find_rounded),
-            label: const Text('백엔드 확인'),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              '서버 주소',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.60),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '안드로이드 에뮬레이터는 보통 10.0.2.2, iOS 시뮬레이터는 보통 127.0.0.1을 사용합니다. '
+              '실제 휴대폰에서는 같은 Wi-Fi에 있는 PC의 IP 주소를 입력해주세요.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.72),
+                height: 1.45,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _baseUrlController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                hintText: 'http://192.168.0.13:8000',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.tonalIcon(
+              onPressed: _isCheckingConnection ? null : _checkConnection,
+              icon: _isCheckingConnection
+                  ? const SizedBox.square(
+                      dimension: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.wifi_find_rounded),
+              label: const Text('백엔드 확인'),
+            ),
+          ],
+        ),
       ),
     );
   }

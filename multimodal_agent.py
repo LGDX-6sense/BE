@@ -1176,6 +1176,8 @@ def run_agent(
     top_k: int = DEFAULT_TOP_K,
     vector_store_id: Optional[str] = None,
     user_name: str = "",
+    device_hint: str = "",
+    user_profile_context: str = "",
 ) -> Dict[str, Any]:
     """Run the full multimodal agent pipeline and return structured output."""
     warnings: List[str] = []
@@ -1194,11 +1196,13 @@ def run_agent(
         except Exception as error:
             warnings.append(f"Image analysis unavailable: {error}")
 
-    device_hint = infer_device_hint(user_text, audio_evidence, image_evidence)
+    inferred_hint = infer_device_hint(user_text, audio_evidence, image_evidence)
+    # 유저 프로필에서 넘어온 device_hint가 있으면 우선 사용
+    resolved_device_hint = device_hint if device_hint and device_hint != "unknown" else inferred_hint
 
     bundle = AgentEvidenceBundle(
         user_text=normalize_whitespace(user_text),
-        device_hint=device_hint,
+        device_hint=resolved_device_hint,
         user_name=normalize_whitespace(user_name),
         audio=audio_evidence,
         image=image_evidence,
@@ -1214,6 +1218,7 @@ def run_agent(
             device_hint=bundle.device_hint,
             image_path=image_path or "",
             audio_path=audio_path or "",
+            user_profile_context=user_profile_context,
         )
 
         # 에이전트가 검색한 이미지를 bundle에 반영
