@@ -304,8 +304,9 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
             content = str(row.get("content_chunk") or row.get("retrieval_text") or "")
             if content:
                 texts.append(content[:800])
-            if not image_paths:
-                image_paths = row.get("_image_public_urls", [])[:8]
+            for url in row.get("_image_public_urls", []):
+                if url and url not in image_paths and len(image_paths) < 8:
+                    image_paths.append(url)
 
         return "\n\n---\n\n".join(texts), image_paths
     except Exception as e:
@@ -322,8 +323,10 @@ def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
     """
     if not image_urls or not text:
         return text
-    # 번호 단계가 없으면 vision 매핑 불필요
-    if not re.search(r'\d+[.)]\s', text):
+    # 단일 짧은 문장이면 vision 매핑 불필요 (번호 단계 또는 줄바꿈 없음)
+    has_numbered = re.search(r'\d+[.)]\s|\d+단계', text)
+    has_paragraphs = text.count('\n') >= 2
+    if not has_numbered and not has_paragraphs:
         return text
 
     vision_model = os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini")
