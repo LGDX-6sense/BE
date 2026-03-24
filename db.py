@@ -73,6 +73,15 @@ def test_database_connection() -> None:
         connection.execute(text("SELECT 1"))
 
 
+def create_tables_if_needed() -> None:
+    """Create all ORM-defined tables in the database if they do not exist."""
+    try:
+        engine = get_engine()
+        Base.metadata.create_all(engine)
+    except Exception:
+        pass
+
+
 def get_database_status() -> Dict[str, Any]:
     """Return a lightweight database health payload."""
     try:

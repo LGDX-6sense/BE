@@ -10,3 +10,8 @@ python-multipart
 sqlalchemy
 pymysql
 cryptography
+pinecone
+supabase
+tqdm
+python-dotenv
+psycopg2-binary

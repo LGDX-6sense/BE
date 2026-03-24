@@ -17,8 +17,6 @@ import 'package:record/record.dart';
 import 'screens/home_screen.dart';
 import 'screens/device_screen.dart';
 import 'screens/care_screen.dart';
-import 'screens/chatthinq_background.dart';
-import 'screens/chatthinq_welcome_screen.dart';
 import 'screens/menu_screen.dart';
 
 const _defaultBaseUrlOverride = String.fromEnvironment('DEFAULT_BASE_URL');
@@ -60,11 +58,11 @@ class _MainShellState extends State<MainShell> {
     final inactiveColor = const Color(0xFF212121).withValues(alpha: 0.30);
 
     final items = <({IconData? icon, String? assetPath, String label})>[
-      (icon: null, assetPath: 'assets/icon/bar_home.png', label: '홈'),
-      (icon: null, assetPath: 'assets/icon/bar_dev.png', label: '디바이스'),
-      (icon: null, assetPath: 'assets/icon/bar_chat.png', label: '챗봇'),
-      (icon: null, assetPath: 'assets/icon/bar_care.png', label: '케어'),
-      (icon: null, assetPath: 'assets/icon/bar_menu.png', label: '메뉴'),
+      (icon: Icons.home_filled, assetPath: null, label: '홈'),
+      (icon: null, assetPath: 'assets/icon/Widget_add.png', label: '디바이스'),
+      (icon: null, assetPath: 'assets/icon/Chat_search.png', label: '챗봇'),
+      (icon: null, assetPath: 'assets/icon/Line_up.png', label: '케어'),
+      (icon: null, assetPath: 'assets/icon/Chart.png', label: '메뉴'),
     ];
 
     return Container(
@@ -248,7 +246,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _isRecordingNoise = false;
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
-  bool _showChatThinQOnboarding = true;
   bool _showArchiveScreen = false;
   bool _archiveOpenedFromChat = false;
   bool _isLoadingArchive = false;
@@ -295,7 +292,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _baseUrlController.text = _defaultBaseUrlOverride.isNotEmpty
         ? _defaultBaseUrlOverride
         : (Platform.isAndroid
-              ? 'http://192.168.0.13:8000'
+              ? 'http://192.168.42.240:8000'
 
               : 'http://127.0.0.1:8000');
     unawaited(_configureTts());
@@ -1597,50 +1594,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
     });
   }
 
-  void _openChatHomeWithPrefill(String message) {
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {
-      _showWelcomeScreen = false;
-      _showArchiveScreen = false;
-      _archiveOpenedFromChat = false;
-      _selectedBottomNavIndex = 2;
-      _history = const [];
-      _chatSessionId = null;
-      _serviceRoutingStep = ServiceRoutingStep.none;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
-      _latestEvidence = null;
-      _errorMessage = null;
-      _messageController
-        ..clear()
-        ..text = message
-        ..selection = TextSelection.collapsed(offset: message.length);
-    });
-  }
-
-  void _dismissChatThinQOnboarding() {
-    if (!_showChatThinQOnboarding) {
-      return;
-    }
-    setState(() {
-      _showChatThinQOnboarding = false;
-    });
-  }
-
-  void _returnToWelcomeScreen() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() {
-      _showWelcomeScreen = true;
-      _showArchiveScreen = false;
-    });
-  }
-
   void _closeArchiveScreen() {
     setState(() {
       _showArchiveScreen = false;
@@ -2500,22 +2453,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildWelcomeScreen() {
     return Scaffold(
-      backgroundColor: const Color(0xFFFCEDEB),
-      body: ChatThinQWelcomeScreen(
-        onCloseTap: _openSettings,
-        onMoreTap: _openSettings,
-        onComposerTap: _openChatHome,
-        onReboTap: _openChatHome,
-        onSuggestionTap: _openChatHomeWithPrefill,
-        showOnboarding: _showChatThinQOnboarding,
-        onDismissOnboarding: _dismissChatThinQOnboarding,
-      ),
-      bottomNavigationBar: widget.hideBottomNav
-          ? null
-          : _buildPrimaryNavigation(),
-    );
-
-    return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFFBF8),
         elevation: 0,
@@ -3226,40 +3163,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ],
               ),
             ),
-            if (isIdle) ...[
-              const SizedBox(height: 24),
-              const Text(
-                '보유 중인 제품으로 접수하기',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 11),
-              Row(
-                children: [
-                  _ReboProductCard(
-                    assetPath: 'assets/icon/home_washing.png',
-                    label: '세탁기',
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 8),
-                  _ReboProductCard(
-                    assetPath: 'assets/icon/home_refrigerator.png',
-                    label: '냉장고',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _ReboProductCard(
-                assetPath: 'assets/icon/home_air.png',
-                label: '에어컨',
-                onTap: () {},
-              ),
-            ],
           ],
         ),
       ),
@@ -5246,7 +5149,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final showMicAction = !_canSend && !_isSubmitting;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(19, 8, 19, 12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: SafeArea(
         top: false,
         child: Column(
@@ -5263,36 +5166,45 @@ class _MobileHomePageState extends State<MobileHomePage> {
             _isRecordingActive
                 ? _buildRecordingComposer()
                 : Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(28),
                       boxShadow: const [
                         BoxShadow(
-                          color: Color(0x0DFD312E),
-                          blurRadius: 8,
+                          color: Color(0x12000000),
+                          blurRadius: 16,
+                          offset: Offset(0, 8),
                         ),
                       ],
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        GestureDetector(
-                          onTap: _isSubmitting ? null : _openAttachmentSheet,
-                          child: Image.asset(
-                            'assets/icon/home_plus.png',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            color: _isSubmitting
-                                ? const Color(0xFF606C80).withValues(alpha: 0.4)
-                                : const Color(0xFF606C80),
-                            colorBlendMode: BlendMode.srcIn,
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF4F0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            tooltip: '첨부 메뉴 열기',
+                            onPressed: _isSubmitting
+                                ? null
+                                : _openAttachmentSheet,
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              Icons.add_rounded,
+                              color: _modePresentation.accent,
+                              size: 20,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 7),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             controller: _messageController,
@@ -5302,23 +5214,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             style: const TextStyle(
                               fontSize: 12.5,
                               height: 1.45,
-                              color: Color(0xFF212121),
                             ),
                             decoration: InputDecoration(
                               hintText: _modePresentation.hintText,
-                              hintStyle: const TextStyle(
-                                fontSize: 12.5,
-                                height: 1.15,
-                                color: Color(0xFF5D5B5B),
-                                fontWeight: FontWeight.w400,
-                                fontFamily: 'Pretendard',
-                              ),
                               filled: false,
                               fillColor: Colors.transparent,
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 0,
-                                vertical: 0,
+                                vertical: 10,
                               ),
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
@@ -5326,47 +5230,43 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 7),
-                        GestureDetector(
-                          onTap: _isSubmitting ? null : _handleMicTap,
-                          child: Image.asset(
-                            'assets/icon/mic.png',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            color: _isSubmitting
-                                ? const Color(0xFF606C80).withValues(alpha: 0.4)
-                                : const Color(0xFF606C80),
-                            colorBlendMode: BlendMode.srcIn,
+                        const SizedBox(width: 6),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: showMicAction
+                                ? const Color(0xFFFFF4F0)
+                                : const Color(0xFFFF937E),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                        ),
-                        const SizedBox(width: 7),
-                        GestureDetector(
-                          onTap: (_isSubmitting || showMicAction)
-                              ? null
-                              : _sendMessage,
-                          child: _isSubmitting
-                              ? const SizedBox.square(
-                                  dimension: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFFFF937E),
-                                  ),
-                                )
-                              : Image.asset(
-                                  'assets/icon/send.png',
-                                  width: 22,
-                                  height: 22,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.medium,
-                                  color: showMicAction
-                                      ? const Color(0xFF606C80).withValues(
-                                          alpha: 0.35,
-                                        )
-                                      : const Color(0xFFFF937E),
-                                  colorBlendMode: BlendMode.srcIn,
-                                ),
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : (showMicAction
+                                        ? _handleMicTap
+                                        : _sendMessage),
+                              icon: _isSubmitting
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Icon(
+                                      showMicAction
+                                          ? Icons.mic_none_rounded
+                                          : Icons.send_rounded,
+                                      size: 18,
+                                      color: showMicAction
+                                          ? Colors.black.withValues(alpha: 0.36)
+                                          : Colors.white,
+                                    ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -5490,55 +5390,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        centerTitle: false,
-        toolbarHeight: 40,
         titleSpacing: 19,
-        title: PopupMenuButton<String>(
-          tooltip: '',
-          padding: EdgeInsets.zero,
-          offset: const Offset(0, 34),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          color: Colors.white,
-          elevation: 10,
-          onSelected: (_) => setState(() => _showWelcomeScreen = true),
-          itemBuilder: (context) => const [
-            PopupMenuItem<String>(
-              value: 'chatthinq',
-              child: Text(
-                'ChatThinQ',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Pretendard',
-                ),
-              ),
-            ),
-          ],
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Chat REBO',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 20,
-                  height: 1.1,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Pretendard',
-                ),
-              ),
-              const SizedBox(width: 6),
-              Image.asset(
-                'assets/icon/down.png',
-                width: 18,
-                height: 18,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              ),
-            ],
+        title: const Text(
+          'Chat REBO',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF212121),
           ),
         ),
         actions: [
@@ -5584,7 +5442,48 @@ class _MobileHomePageState extends State<MobileHomePage> {
       ),
       body: Stack(
         children: [
-          const Positioned.fill(child: ChatThinQBackground()),
+          // 배경 블러 원 (좌측)
+          Positioned(
+            left: -120,
+            top: MediaQuery.of(context).size.height * 0.05,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
+                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 배경 블러 원 (우측)
+          Positioned(
+            right: -120,
+            top: MediaQuery.of(context).size.height * 0.5,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
+                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
           SafeArea(
             child: Column(
               children: [
@@ -5620,7 +5519,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         'AI가 생성한 응답은 부정확할 수 있습니다.',
                         style: TextStyle(
                           color: Color(0xFF5D5B5B),
-                          fontSize: 12,
+                          fontSize: 10,
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -5629,7 +5528,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         '더보기',
                         style: TextStyle(
                           color: Color(0xFF5D5B5B),
-                          fontSize: 12,
+                          fontSize: 10,
                           fontWeight: FontWeight.w400,
                           decoration: TextDecoration.underline,
                         ),
@@ -5752,57 +5651,6 @@ class _ModePresentation {
   final String hintText;
   final List<Color> gradientColors;
   final Color accent;
-}
-
-class _ReboProductCard extends StatelessWidget {
-  const _ReboProductCard({
-    required this.assetPath,
-    required this.label,
-    required this.onTap,
-  });
-
-  final String assetPath;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 154,
-        height: 49,
-        padding: const EdgeInsets.only(left: 12),
-        decoration: BoxDecoration(
-          color: const Color(0x0D212121),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              assetPath,
-              width: 24,
-              height: 24,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-                height: 1.3,
-                fontFamily: 'Pretendard',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _HeroActionButton extends StatelessWidget {
@@ -6584,13 +6432,13 @@ class _CloseOutlineIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       'assets/icon/chat_close.png',
-      width: 18,
-      height: 18,
+      width: 17,
+      height: 17,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         return SizedBox(
-          width: 18,
-          height: 18,
+          width: 17,
+          height: 17,
           child: CustomPaint(painter: _CloseOutlinePainter()),
         );
       },
@@ -6618,16 +6466,16 @@ class _ArchiveOutlineIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       'assets/icon/chat_arhive.png',
-      width: 18,
-      height: 18,
+      width: 17,
+      height: 17,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         return SizedBox(
-          width: 18,
-          height: 18,
+          width: 17,
+          height: 17,
           child: Icon(
             Icons.inventory_2_outlined,
-            size: 18,
+            size: 17,
             color: const Color(0xFF23201E),
           ),
         );

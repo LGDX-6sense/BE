@@ -1,9 +1,8 @@
-// ignore_for_file: unused_element
+﻿// ignore_for_file: unused_element
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
@@ -57,15 +56,36 @@ class _MainShellState extends State<MainShell> {
 
   Widget _buildBottomNav() {
     const activeColor = Color(0xFF212121);
-    final inactiveColor = const Color(0xFF212121).withValues(alpha: 0.30);
+    const inactiveColor = Color(0xFF606C80);
 
-    final items = <({IconData? icon, String? assetPath, String label})>[
-      (icon: null, assetPath: 'assets/icon/bar_home.png', label: '홈'),
-      (icon: null, assetPath: 'assets/icon/bar_dev.png', label: '디바이스'),
-      (icon: null, assetPath: 'assets/icon/bar_chat.png', label: '챗봇'),
-      (icon: null, assetPath: 'assets/icon/bar_care.png', label: '케어'),
-      (icon: null, assetPath: 'assets/icon/bar_menu.png', label: '메뉴'),
-    ];
+    final items =
+        <({String activeAssetPath, String inactiveAssetPath, String label})>[
+          (
+            activeAssetPath: 'assets/icon/home.png',
+            inactiveAssetPath: 'assets/icon/home_un.png',
+            label: '??,
+          ),
+          (
+            activeAssetPath: 'assets/icon/device.png',
+            inactiveAssetPath: 'assets/icon/device_un.png',
+            label: '?붾컮?댁뒪',
+          ),
+          (
+            activeAssetPath: 'assets/icon/ai_.png',
+            inactiveAssetPath: 'assets/icon/ai_un.png',
+            label: '梨쀫큸',
+          ),
+          (
+            activeAssetPath: 'assets/icon/care.png',
+            inactiveAssetPath: 'assets/icon/care_un.png',
+            label: '耳??,
+          ),
+          (
+            activeAssetPath: 'assets/icon/menu.png',
+            inactiveAssetPath: 'assets/icon/menu_un.png',
+            label: '硫붾돱',
+          ),
+        ];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
@@ -89,29 +109,22 @@ class _MainShellState extends State<MainShell> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        items[i].assetPath != null
-                            ? Opacity(
-                                opacity: _currentIndex == i ? 1.0 : 0.30,
-                                child: Image.asset(
-                                  items[i].assetPath!,
-                                  width: 18,
-                                  height: 18,
-                                ),
-                              )
-                            : Icon(
-                                items[i].icon,
-                                size: 18,
-                                color: _currentIndex == i
-                                    ? activeColor
-                                    : inactiveColor,
-                              ),
+                        Image.asset(
+                          _currentIndex == i
+                              ? items[i].activeAssetPath
+                              : items[i].inactiveAssetPath,
+                          width: 24,
+                          height: 24,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           items[i].label,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: _currentIndex == i
-                                ? FontWeight.w700
+                                ? FontWeight.w600
                                 : FontWeight.w400,
                             color: _currentIndex == i
                                 ? activeColor
@@ -207,19 +220,19 @@ class _MobileHomePageState extends State<MobileHomePage> {
     'aac',
     'flac',
   };
-  // 서버 INTENT_KEYWORD_HINTS와 동기화된 목록 (mobile_api.py 참조)
+  // ?쒕쾭 INTENT_KEYWORD_HINTS? ?숆린?붾맂 紐⑸줉 (mobile_api.py 李몄“)
   static const List<String> _serviceActionKeywords = [
-    // AS 신청
-    'as', 'a/s', 'as신청', 'a/s신청', 'as 신청', 'a/s 신청',
-    '서비스신청', '서비스 신청', '수리신청', '수리 신청', '수리 접수', 'as접수', 'as 접수',
-    // 상담사 연결
-    '상담', '상담사', '상담원', '고객센터', '콜센터', '전화', '통화',
-    '사람이랑', '직원', '연결',
-    // 방문/출장 예약
-    '출장', '방문', '기사', '기사님', '접수',
-    '예약', '예약하기', '예약 해줘', '예약해줘', '예약 부탁', '예약 부탁해',
-    '수리 예약', '방문 예약', '출장 예약', '출장 서비스',
-    '서비스 예약', '상담 예약', '서비스센터', '서비스 센터',
+    // AS ?좎껌
+    'as', 'a/s', 'as?좎껌', 'a/s?좎껌', 'as ?좎껌', 'a/s ?좎껌',
+    '?쒕퉬?ㅼ떊泥?, '?쒕퉬???좎껌', '?섎━?좎껌', '?섎━ ?좎껌', '?섎━ ?묒닔', 'as?묒닔', 'as ?묒닔',
+    // ?곷떞???곌껐
+    '?곷떞', '?곷떞??, '?곷떞??, '怨좉컼?쇳꽣', '肄쒖꽱??, '?꾪솕', '?듯솕',
+    '?щ엺?대옉', '吏곸썝', '?곌껐',
+    // 諛⑸Ц/異쒖옣 ?덉빟
+    '異쒖옣', '諛⑸Ц', '湲곗궗', '湲곗궗??, '?묒닔',
+    '?덉빟', '?덉빟?섍린', '?덉빟 ?댁쨾', '?덉빟?댁쨾', '?덉빟 遺??, '?덉빟 遺?곹빐',
+    '?섎━ ?덉빟', '諛⑸Ц ?덉빟', '異쒖옣 ?덉빟', '異쒖옣 ?쒕퉬??,
+    '?쒕퉬???덉빟', '?곷떞 ?덉빟', '?쒕퉬?ㅼ꽱??, '?쒕퉬???쇳꽣',
   ];
 
   final _messageController = TextEditingController();
@@ -254,16 +267,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _isLoadingArchive = false;
   int _selectedBottomNavIndex = 0;
   int _dbUserId = 3;
-  String _dbUserName = '지영';
+  String _dbUserName = '吏??;
 
   static const _demoUsers = <(int, String)>[
-    (1, '경옥'),
-    (2, '경은'),
-    (3, '지영'),
-    (4, '수현'),
-    (5, '혜민'),
+    (1, '寃쎌삦'),
+    (2, '寃쎌?'),
+    (3, '吏??),
+    (4, '?섑쁽'),
+    (5, '?쒕?'),
   ];
-  String _serverStatus = '확인 중';
+  String _serverStatus = '?뺤씤 以?;
   String? _archiveErrorMessage;
   List<ArchiveSessionSummary> _archiveSessions = const [];
   ServiceRoutingStep _serviceRoutingStep = ServiceRoutingStep.none;
@@ -281,10 +294,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Timer? _composerDebounceTimer;
 
   static const _agentStepLabels = [
-    '증상 분류 중...',
-    '원인 분석 중...',
-    '심각도 판단 중...',
-    '해결책 준비 중...',
+    '利앹긽 遺꾨쪟 以?..',
+    '?먯씤 遺꾩꽍 以?..',
+    '?ш컖???먮떒 以?..',
+    '?닿껐梨?以鍮?以?..',
   ];
 
   @override
@@ -295,8 +308,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _baseUrlController.text = _defaultBaseUrlOverride.isNotEmpty
         ? _defaultBaseUrlOverride
         : (Platform.isAndroid
+              //? 'http://192.168.42.240:8000'
               ? 'http://192.168.0.13:8000'
-
               : 'http://127.0.0.1:8000');
     unawaited(_configureTts());
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkConnection());
@@ -403,7 +416,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   String get _displayName {
     final value = _dbUserName.trim();
-    return value.isEmpty ? 'ㅇㅇ' : value;
+    return value.isEmpty ? '?뉎뀋' : value;
   }
 
   String get _baseUrl {
@@ -417,39 +430,39 @@ class _MobileHomePageState extends State<MobileHomePage> {
     switch (_assistantMode) {
       case AssistantMode.audio:
         return const _ModePresentation(
-          label: 'AI CHAT · Listening Sound Ver',
-          title: '소리를 듣고 있어요.\n정확한 진단을 위해\n주변 소음을 차단해주세요.',
-          description: '말하기(STT)와 소음 녹음을 구분해서 인식하고 처리해요.',
-          hintText: '소리 특징을 텍스트로 입력해주세요',
+          label: 'AI CHAT 쨌 Listening Sound Ver',
+          title: '?뚮━瑜??ｊ퀬 ?덉뼱??\n?뺥솗??吏꾨떒???꾪빐\n二쇰? ?뚯쓬??李⑤떒?댁＜?몄슂.',
+          description: '留먰븯湲?STT)? ?뚯쓬 ?뱀쓬??援щ텇?댁꽌 ?몄떇?섍퀬 泥섎━?댁슂.',
+          hintText: '?뚮━ ?뱀쭠???띿뒪?몃줈 ?낅젰?댁＜?몄슂',
           gradientColors: [Color(0xFFFFF4F1), Color(0xFFFFD9D2)],
           accent: Color(0xFFE95A4D),
         );
       case AssistantMode.photo:
         return const _ModePresentation(
-          label: 'AI CHAT · Analyzing Photo Ver',
-          title: '사진 모드예요.\n증상이 잘 보이도록\n가까이 찍어주세요.',
-          description: '카메라로 다시 촬영하거나 갤러리 사진을 교체할 수 있어요.',
-          hintText: '사진과 함께 상태를 입력해주세요',
+          label: 'AI CHAT 쨌 Analyzing Photo Ver',
+          title: '?ъ쭊 紐⑤뱶?덉슂.\n利앹긽????蹂댁씠?꾨줉\n媛源뚯씠 李띿뼱二쇱꽭??',
+          description: '移대찓?쇰줈 ?ㅼ떆 珥ъ쁺?섍굅??媛ㅻ윭由??ъ쭊??援먯껜?????덉뼱??',
+          hintText: '?ъ쭊怨??④퍡 ?곹깭瑜??낅젰?댁＜?몄슂',
           gradientColors: [Color(0xFFFFF5F2), Color(0xFFFFDDE2)],
           accent: Color(0xFFEF6B64),
         );
       case AssistantMode.replying:
         return const _ModePresentation(
-          label: 'AI CHAT · Thinking Ver',
-          title: '답변을 작성중이에요.\n조금만 기다려주세요.',
-          description: '텍스트, 사진, 소리 정보를 합쳐서 진단 내용을 정리하고 있어요.',
-          hintText: '응답 생성 중 ···',
+          label: 'AI CHAT 쨌 Thinking Ver',
+          title: '?듬????묒꽦以묒씠?먯슂.\n議곌툑留?湲곕떎?ㅼ＜?몄슂.',
+          description: '?띿뒪?? ?ъ쭊, ?뚮━ ?뺣낫瑜??⑹퀜??吏꾨떒 ?댁슜???뺣━?섍퀬 ?덉뼱??',
+          hintText: '?묐떟 ?앹꽦 以?쨌쨌쨌',
           gradientColors: [Color(0xFFFFF4F2), Color(0xFFFFD7DB)],
           accent: Color(0xFFD34B5C),
         );
       case AssistantMode.idle:
       case AssistantMode.maincharacter:
         return _ModePresentation(
-          label: 'AI CHAT · Normal Ver',
-          title: '안녕하세요 $_displayName님\n어떤 문제 상황인가요?',
+          label: 'AI CHAT 쨌 Normal Ver',
+          title: '?덈뀞?섏꽭??$_displayName??n?대뼡 臾몄젣 ?곹솴?멸???',
           description:
-              '텍스트를 입력하거나 + 버튼으로 사진과 파일을, 마이크 버튼으로 STT 또는 소음 녹음을 선택할 수 있어요.',
-          hintText: '메시지를 입력하세요',
+              '?띿뒪?몃? ?낅젰?섍굅??+ 踰꾪듉?쇰줈 ?ъ쭊怨??뚯씪?? 留덉씠??踰꾪듉?쇰줈 STT ?먮뒗 ?뚯쓬 ?뱀쓬???좏깮?????덉뼱??',
+          hintText: '硫붿떆吏瑜??낅젰?섏꽭??,
           gradientColors: const [Color(0xFFFFF7F3), Color(0xFFFFDCD6)],
           accent: const Color(0xFFE9524A),
         );
@@ -492,7 +505,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return;
       }
       setState(() {
-        _errorMessage = '음성 출력을 준비하지 못했습니다: $error';
+        _errorMessage = '?뚯꽦 異쒕젰??以鍮꾪븯吏 紐삵뻽?듬땲?? $error';
       });
     }
   }
@@ -550,7 +563,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return;
       }
       setState(() {
-        _errorMessage = '음성 재생에 실패했습니다: $error';
+        _errorMessage = '?뚯꽦 ?ъ깮???ㅽ뙣?덉뒿?덈떎: $error';
       });
     }
   }
@@ -562,7 +575,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
     setState(() {
       _isCheckingConnection = true;
-      _serverStatus = '확인 중';
+      _serverStatus = '?뺤씤 以?;
       _errorMessage = null;
     });
 
@@ -578,9 +591,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _serverHealthy =
             response.statusCode >= 200 && response.statusCode < 300;
-        _serverStatus = _serverHealthy ? '연결됨' : 'HTTP ${response.statusCode}';
+        _serverStatus = _serverHealthy ? '?곌껐?? : 'HTTP ${response.statusCode}';
         if (!_serverHealthy) {
-          _errorMessage = '백엔드 상태 확인에 실패했습니다.';
+          _errorMessage = '諛깆뿏???곹깭 ?뺤씤???ㅽ뙣?덉뒿?덈떎.';
         }
       });
     } catch (error) {
@@ -590,8 +603,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _serverHealthy = false;
-        _serverStatus = '오프라인';
-        _errorMessage = '백엔드에 연결할 수 없습니다: $error';
+        _serverStatus = '?ㅽ봽?쇱씤';
+        _errorMessage = '諛깆뿏?쒖뿉 ?곌껐?????놁뒿?덈떎: $error';
       });
     } finally {
       if (mounted) {
@@ -637,7 +650,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final picked = result.files.single;
     if (picked.path == null) {
       setState(() {
-        _errorMessage = '선택한 오디오 파일을 읽을 수 없습니다.';
+        _errorMessage = '?좏깮???ㅻ뵒???뚯씪???쎌쓣 ???놁뒿?덈떎.';
       });
       return;
     }
@@ -645,7 +658,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final extension = picked.extension?.toLowerCase() ?? '';
     if (!_supportedAudioExtensions.contains(extension)) {
       setState(() {
-        _errorMessage = '지원하는 오디오 형식만 사용할 수 있어요: wav, mp3, m4a, aac, flac';
+        _errorMessage = '吏?먰븯???ㅻ뵒???뺤떇留??ъ슜?????덉뼱?? wav, mp3, m4a, aac, flac';
       });
       return;
     }
@@ -678,7 +691,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           return;
         }
         setState(() {
-          _errorMessage = '마이크 권한이 필요합니다.';
+          _errorMessage = '留덉씠??沅뚰븳???꾩슂?⑸땲??';
         });
         return;
       }
@@ -718,7 +731,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _isRecordingVoice = false;
-        _errorMessage = '녹음을 시작하지 못했습니다: $error';
+        _errorMessage = '?뱀쓬???쒖옉?섏? 紐삵뻽?듬땲?? $error';
       });
       _stopRecordingUiTimer();
     }
@@ -735,7 +748,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _isRecordingVoice = false;
         if (savedPath == null || savedPath.isEmpty) {
-          _errorMessage = '녹음 파일을 저장하지 못했습니다.';
+          _errorMessage = '?뱀쓬 ?뚯씪????ν븯吏 紐삵뻽?듬땲??';
           return;
         }
 
@@ -750,7 +763,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _isRecordingVoice = false;
-        _errorMessage = '녹음을 종료하지 못했습니다: $error';
+        _errorMessage = '?뱀쓬??醫낅즺?섏? 紐삵뻽?듬땲?? $error';
       });
       _stopRecordingUiTimer();
     }
@@ -768,7 +781,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_isSubmitting) return;
     if (_isRecordingVoice) {
       if (!mounted) return;
-      setState(() => _errorMessage = '음성 녹음 중에는 소음 녹음을 시작할 수 없습니다.');
+      setState(() => _errorMessage = '?뚯꽦 ?뱀쓬 以묒뿉???뚯쓬 ?뱀쓬???쒖옉?????놁뒿?덈떎.');
       return;
     }
 
@@ -777,7 +790,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       final hasPermission = await _voiceRecorder.hasPermission();
       if (!hasPermission) {
         if (!mounted) return;
-        setState(() => _errorMessage = '마이크 권한이 필요합니다.');
+        setState(() => _errorMessage = '留덉씠??沅뚰븳???꾩슂?⑸땲??');
         return;
       }
 
@@ -811,7 +824,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       if (!mounted) return;
       setState(() {
         _isRecordingNoise = false;
-        _errorMessage = '소음 녹음을 시작하지 못했습니다: $error';
+        _errorMessage = '?뚯쓬 ?뱀쓬???쒖옉?섏? 紐삵뻽?듬땲?? $error';
       });
       _stopRecordingUiTimer();
     }
@@ -826,7 +839,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _isRecordingNoise = false;
         if (savedPath == null || savedPath.isEmpty) {
-          _errorMessage = '소음 녹음 파일을 저장하지 못했습니다.';
+          _errorMessage = '?뚯쓬 ?뱀쓬 ?뚯씪????ν븯吏 紐삵뻽?듬땲??';
           return;
         }
         _recordedNoise = File(savedPath);
@@ -837,7 +850,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       if (!mounted) return;
       setState(() {
         _isRecordingNoise = false;
-        _errorMessage = '소음 녹음을 종료하지 못했습니다: $error';
+        _errorMessage = '?뚯쓬 ?뱀쓬??醫낅즺?섏? 紐삵뻽?듬땲?? $error';
       });
       _stopRecordingUiTimer();
     }
@@ -916,7 +929,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '녹음방법',
+                '?뱀쓬諛⑸쾿',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -926,7 +939,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ),
               const SizedBox(height: 4),
               const Text(
-                '어떤 내용을 녹음할지 선택해주세요.',
+                '?대뼡 ?댁슜???뱀쓬?좎? ?좏깮?댁＜?몄슂.',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
@@ -962,7 +975,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              '음성채팅',
+                              '?뚯꽦梨꾪똿',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -1001,7 +1014,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              '소음/진동',
+                              '?뚯쓬/吏꾨룞',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -1059,12 +1072,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '첨부 방법 선택',
+                  '泥⑤? 諛⑸쾿 ?좏깮',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '원하는 방법을 선택해주세요',
+                  '?먰븯??諛⑸쾿???좏깮?댁＜?몄슂',
                   style: TextStyle(
                     fontSize: 11.5,
                     color: Colors.black.withValues(alpha: 0.56),
@@ -1076,7 +1089,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     Expanded(
                       child: _AttachmentQuickAction(
                         icon: Icons.photo_camera_outlined,
-                        label: '카메라',
+                        label: '移대찓??,
                         onTap: () => handleTap(_capturePhoto),
                       ),
                     ),
@@ -1084,7 +1097,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     Expanded(
                       child: _AttachmentQuickAction(
                         icon: Icons.image_outlined,
-                        label: '사진',
+                        label: '?ъ쭊',
                         onTap: () => handleTap(_pickImageFromGallery),
                       ),
                     ),
@@ -1092,7 +1105,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     Expanded(
                       child: _AttachmentQuickAction(
                         icon: Icons.attach_file_rounded,
-                        label: '파일',
+                        label: '?뚯씪',
                         onTap: () => handleTap(_pickAudio),
                       ),
                     ),
@@ -1174,18 +1187,18 @@ class _MobileHomePageState extends State<MobileHomePage> {
       parts.add(message.trim());
     }
     if (imageName != null && imageName.trim().isNotEmpty) {
-      parts.add('[이미지 첨부: ${imageName.trim()}]');
+      parts.add('[?대?吏 泥⑤?: ${imageName.trim()}]');
     }
     if (audioName != null && audioName.trim().isNotEmpty) {
-      parts.add('[오디오 첨부: ${audioName.trim()}]');
+      parts.add('[?ㅻ뵒??泥⑤?: ${audioName.trim()}]');
     }
     if (voiceName != null && voiceName.trim().isNotEmpty) {
-      parts.add('[음성 메시지: ${voiceName.trim()}]');
+      parts.add('[?뚯꽦 硫붿떆吏: ${voiceName.trim()}]');
     }
     if (noiseName != null && noiseName.trim().isNotEmpty) {
-      parts.add('[오디오 첨부: ${noiseName.trim()}]');
+      parts.add('[?ㅻ뵒??泥⑤?: ${noiseName.trim()}]');
     }
-    return parts.isEmpty ? '[입력 없음]' : parts.join('\n');
+    return parts.isEmpty ? '[?낅젰 ?놁쓬]' : parts.join('\n');
   }
 
   void _appendLocalUserTurnAndPromptServiceRouting({
@@ -1253,14 +1266,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$actionLabel 선택 화면으로 이어질 수 있도록 준비했어요.')),
+      SnackBar(content: Text('$actionLabel ?좏깮 ?붾㈃?쇰줈 ?댁뼱吏????덈룄濡?以鍮꾪뻽?댁슂.')),
     );
   }
 
   String _stripDisplayedImageAttachmentLine(String message) {
     return message
         .split('\n')
-        .where((line) => !line.trim().startsWith('[이미지 첨부:'))
+        .where((line) => !line.trim().startsWith('[?대?吏 泥⑤?:'))
         .join('\n')
         .trim();
   }
@@ -1319,7 +1332,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _recordedVoice == null &&
         _recordedNoise == null) {
       setState(() {
-        _errorMessage = '텍스트, 사진, 음성 중 하나 이상을 추가해주세요.';
+        _errorMessage = '?띿뒪?? ?ъ쭊, ?뚯꽦 以??섎굹 ?댁긽??異붽??댁＜?몄슂.';
       });
       return;
     }
@@ -1407,7 +1420,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       }
 
       if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('백엔드 응답 형식이 올바르지 않습니다.');
+        throw const FormatException('諛깆뿏???묐떟 ?뺤떇???щ컮瑜댁? ?딆뒿?덈떎.');
       }
 
       final nextHistory = <ChatTurn>[];
@@ -1433,7 +1446,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           routingRequired && asRoutingIntents.contains(routingIntent);
       final nextRoutingStep = ServiceRoutingStep.none;
 
-      // AS 관련 인텐트 → 마지막 턴 assistant를 __AS_ROUTING__으로 교체
+      // AS 愿???명뀗????留덉?留???assistant瑜?__AS_ROUTING__?쇰줈 援먯껜
       final rawAssistantMessage =
           decoded['assistant_message']?.toString().trim() ??
           (mergedHistory.isNotEmpty ? mergedHistory.last.assistant : '');
@@ -1501,7 +1514,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _recordedNoiseName = null;
         _messageController.clear();
         _serverHealthy = true;
-        _serverStatus = '연결됨';
+        _serverStatus = '?곌껐??;
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1514,7 +1527,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         }
       });
 
-      // 일반 응답일 때 텍스트 스트리밍 시뮬레이션 시작
+      // ?쇰컲 ?묐떟?????띿뒪???ㅽ듃由щ컢 ?쒕??덉씠???쒖옉
       if (!isAsRouting &&
           assistantMessage.isNotEmpty &&
           finalHistory.isNotEmpty) {
@@ -1531,7 +1544,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _serverHealthy = false;
-        _serverStatus = '요청 실패';
+        _serverStatus = '?붿껌 ?ㅽ뙣';
         _errorMessage = error.toString();
       });
     } finally {
@@ -1716,7 +1729,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ],
                 ),
                 Text(
-                  '저장된 대화 목록을 확인해보세요.',
+                  '??λ맂 ???紐⑸줉???뺤씤?대낫?몄슂.',
                   style: TextStyle(
                     fontSize: 11.5,
                     color: Colors.black.withValues(alpha: 0.56),
@@ -1750,7 +1763,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
-                      '저장된 대화가 아직 없어요.',
+                      '??λ맂 ??붽? ?꾩쭅 ?놁뼱??',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -1894,7 +1907,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       }
 
       if (body is! Map<String, dynamic>) {
-        throw const FormatException('보관함 응답 형식이 올바르지 않습니다.');
+        throw const FormatException('蹂닿????묐떟 ?뺤떇???щ컮瑜댁? ?딆뒿?덈떎.');
       }
 
       final items = <ArchiveSessionSummary>[];
@@ -1914,7 +1927,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _archiveSessions = items;
         _serverHealthy = true;
-        _serverStatus = '연결됨';
+        _serverStatus = '?곌껐??;
       });
     } catch (error) {
       if (!mounted) {
@@ -1924,7 +1937,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _archiveErrorMessage = error.toString();
         _serverHealthy = false;
-        _serverStatus = '요청 실패';
+        _serverStatus = '?붿껌 ?ㅽ뙣';
       });
     } finally {
       if (mounted) {
@@ -1952,7 +1965,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       }
 
       if (body is! Map<String, dynamic>) {
-        throw const FormatException('보관함 상세 응답 형식이 올바르지 않습니다.');
+        throw const FormatException('蹂닿????곸꽭 ?묐떟 ?뺤떇???щ컮瑜댁? ?딆뒿?덈떎.');
       }
 
       final messages = <ArchiveMessage>[];
@@ -1971,7 +1984,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       final restoredHistory = _restoreChatTurnsFromArchiveMessages(messages);
       if (restoredHistory.isEmpty) {
-        throw const FormatException('이어서 열 수 있는 대화 내용이 없어요.');
+        throw const FormatException('?댁뼱???????덈뒗 ????댁슜???놁뼱??');
       }
 
       setState(() {
@@ -2023,7 +2036,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      message.role == 'assistant' ? 'AI 답변' : '사용자',
+                      message.role == 'assistant' ? 'AI ?듬?' : '?ъ슜??,
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -2072,9 +2085,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return '';
       }
       final label = switch (message.messageType) {
-        'image' => '이미지 첨부',
-        'audio' => '음성 첨부',
-        _ => '첨부 파일',
+        'image' => '?대?吏 泥⑤?',
+        'audio' => '?뚯꽦 泥⑤?',
+        _ => '泥⑤? ?뚯씪',
       };
       return message.attachmentNames
           .map((name) => '[$label: $name]')
@@ -2142,11 +2155,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
   String _archiveStatusLabel(String status) {
     switch (status) {
       case 'resolved':
-        return '해결됨';
+        return '?닿껐??;
       case 'archived':
-        return '보관됨';
+        return '蹂닿???;
       default:
-        return '진행중';
+        return '吏꾪뻾以?;
     }
   }
 
@@ -2159,7 +2172,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          tooltip: '홈으로',
+          tooltip: '?덉쑝濡?,
           onPressed: _closeArchiveScreen,
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
         ),
@@ -2171,7 +2184,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             Text(
-              '저장된 대화 목록',
+              '??λ맂 ???紐⑸줉',
               style: TextStyle(
                 fontSize: 10,
                 color: Colors.black.withValues(alpha: 0.48),
@@ -2181,12 +2194,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         actions: [
           IconButton(
-            tooltip: '새 대화',
+            tooltip: '?????,
             onPressed: _openChatHome,
             icon: const Icon(Icons.add_comment_outlined),
           ),
           IconButton(
-            tooltip: '새로고침',
+            tooltip: '?덈줈怨좎묠',
             onPressed: _loadArchiveSessions,
             icon: const Icon(Icons.refresh_rounded),
           ),
@@ -2246,7 +2259,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    '대화 보관함',
+                                    '???蹂닿???,
                                     style: TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w800,
@@ -2255,8 +2268,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                   const SizedBox(height: 4),
                                   Text(
                                     hasSessions
-                                        ? '총 ${_archiveSessions.length}개의 대화가 저장되어 있어요.'
-                                        : '저장된 대화를 여기에서 다시 확인할 수 있어요.',
+                                        ? '珥?${_archiveSessions.length}媛쒖쓽 ??붽? ??λ릺???덉뼱??'
+                                        : '??λ맂 ??붾? ?ш린?먯꽌 ?ㅼ떆 ?뺤씤?????덉뼱??',
                                     style: TextStyle(
                                       fontSize: 11,
                                       height: 1.45,
@@ -2284,7 +2297,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                '목록을 불러오지 못했어요.',
+                                '紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?댁슂.',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
@@ -2303,7 +2316,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                               const SizedBox(height: 10),
                               TextButton(
                                 onPressed: _loadArchiveSessions,
-                                child: const Text('다시 시도'),
+                                child: const Text('?ㅼ떆 ?쒕룄'),
                               ),
                             ],
                           ),
@@ -2316,7 +2329,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         const SizedBox(height: 12),
                         const Center(
                           child: Text(
-                            '보관된 대화를 불러오는 중이에요.',
+                            '蹂닿?????붾? 遺덈윭?ㅻ뒗 以묒씠?먯슂.',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -2375,12 +2388,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
           const SizedBox(height: 14),
           const Text(
-            '아직 저장된 대화가 없어요.',
+            '?꾩쭅 ??λ맂 ??붽? ?놁뼱??',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Text(
-            '새로 대화를 시작하면 제목과 한줄 요약이 자동으로 보관돼요.',
+            '?덈줈 ??붾? ?쒖옉?섎㈃ ?쒕ぉ怨??쒖쨪 ?붿빟???먮룞?쇰줈 蹂닿??쇱슂.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 11.5,
@@ -2394,7 +2407,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFE9524A),
             ),
-            child: const Text('새 대화 시작'),
+            child: const Text('??????쒖옉'),
           ),
         ],
       ),
@@ -2478,7 +2491,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             Row(
               children: [
                 Text(
-                  '대화 다시 보기',
+                  '????ㅼ떆 蹂닿린',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -2514,259 +2527,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ? null
           : _buildPrimaryNavigation(),
     );
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFFFBF8),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text(
-          'ChatThinQ',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x14000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              tooltip: '연결 설정',
-              onPressed: _openSettings,
-              icon: const Icon(Icons.tune_rounded, size: 20),
-            ),
-          ),
-        ],
-      ),
-      backgroundColor: const Color(0xFFFCEDEB),
-      body: Stack(
-        children: [
-          // 배경 블러 원 (좌측 상단)
-          Positioned(
-            left: -120,
-            top: MediaQuery.of(context).size.height * 0.05,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
-                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // 배경 블러 원 (우측 하단)
-          Positioned(
-            right: -120,
-            bottom: MediaQuery.of(context).size.height * 0.1,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-              child: Container(
-                width: 240,
-                height: 240,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFFFCAEB2).withValues(alpha: 0.60),
-                      const Color(0xFFFCBABD).withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF6A57),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            'NEW',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'AS와 문제 진단으로 고통 받았던\n당신만을 위한 새로운 해결사',
-                          style: TextStyle(
-                            fontSize: 18,
-                            height: 1.34,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF231E1D),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: _openChatHome,
-                            borderRadius: BorderRadius.circular(38),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(22, 0, 0, 0),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(38),
-                                border: Border.all(
-                                  color: const Color(0xFFF0E2DE),
-                                  width: 1.2,
-                                ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x22000000),
-                                    blurRadius: 24,
-                                    offset: Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: SizedBox(
-                                height: 150,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          top: 5,
-                                          bottom: 10,
-                                          right: 8,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const SizedBox(height: 18),
-                                            const Text(
-                                              '제품과 관련된 질문은\n저에게 물어보세요!',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                height: 1.35,
-                                                fontWeight: FontWeight.w800,
-                                                color: Color(0xFF231E1D),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
-                                            FilledButton(
-                                              onPressed: _openChatHome,
-                                              style: FilledButton.styleFrom(
-                                                elevation: 0,
-                                                backgroundColor: const Color(
-                                                  0xFFD6D9FF,
-                                                ),
-                                                foregroundColor:
-                                                    const Color.fromARGB(
-                                                      255,
-                                                      89,
-                                                      101,
-                                                      211,
-                                                    ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 13,
-                                                      vertical: 13,
-                                                    ),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        999,
-                                                      ),
-                                                ),
-                                              ),
-                                              child: const Text(
-                                                'Chat REBO 사용하기',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w800,
-                                                ),
-                                              ),
-                                            ),
-                                            const Spacer(),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: 172,
-                                      child: Align(
-                                        alignment: Alignment.bottomRight,
-                                        child: SizedBox(
-                                          width: 172,
-                                          height: 150,
-                                          child: Image.asset(
-                                            _characterAssetForMode(
-                                              AssistantMode.maincharacter,
-                                            ),
-                                            fit: BoxFit.fitHeight,
-                                            alignment: Alignment.bottomRight,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Center(
-                          child: Text(
-                            'API 생성형 콘텐츠를 부분적으로 수집할 수 있습니다. 더보기',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 9.5,
-                              color: Colors.black.withValues(alpha: 0.34),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _buildWelcomeComposer(),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-                ),
-                if (!widget.hideBottomNav) _buildPrimaryNavigation(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildWelcomeComposer() {
@@ -2801,7 +2561,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '텍스트를 입력해주세요',
+              '?띿뒪?몃? ?낅젰?댁＜?몄슂',
               style: TextStyle(
                 fontSize: 11.5,
                 color: Colors.black.withValues(alpha: 0.36),
@@ -2831,7 +2591,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         <({IconData icon, String label, bool active, VoidCallback? onTap})>[
           (
             icon: Icons.home_filled,
-            label: '홈',
+            label: '??,
             active: !_showArchiveScreen,
             onTap: () => setState(() {
               _showWelcomeScreen = true;
@@ -2840,25 +2600,25 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
           (
             icon: Icons.grid_view_rounded,
-            label: '디바이스',
+            label: '?붾컮?댁뒪',
             active: false,
             onTap: null,
           ),
           (
             icon: Icons.search_rounded,
-            label: '챗봇',
+            label: '梨쀫큸',
             active: false,
             onTap: _openChatHome,
           ),
           (
             icon: Icons.bar_chart_rounded,
-            label: '제어',
+            label: '?쒖뼱',
             active: false,
             onTap: null,
           ),
           (
             icon: Icons.article_outlined,
-            label: '메뉴',
+            label: '硫붾돱',
             active: false,
             onTap: null,
           ),
@@ -2922,17 +2682,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final items =
         <
           ({
-            IconData? icon,
-            String? assetPath,
+            String activeAssetPath,
+            String inactiveAssetPath,
             String label,
             bool active,
             VoidCallback onTap,
           })
         >[
           (
-            icon: Icons.home_filled,
-            assetPath: null,
-            label: '홈',
+            activeAssetPath: 'assets/icon/home.png',
+            inactiveAssetPath: 'assets/icon/home_un.png',
+            label: '??,
             active: _selectedBottomNavIndex == 0,
             onTap: () => setState(() {
               _selectedBottomNavIndex = 0;
@@ -2942,9 +2702,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
             }),
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Widget_add.png',
-            label: '디바이스',
+            activeAssetPath: 'assets/icon/device.png',
+            inactiveAssetPath: 'assets/icon/device_un.png',
+            label: '?붾컮?댁뒪',
             active: _selectedBottomNavIndex == 1,
             onTap: () => setState(() {
               _selectedBottomNavIndex = 1;
@@ -2954,16 +2714,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
             }),
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Chat_search.png',
-            label: '챗봇',
+            activeAssetPath: 'assets/icon/ai_.png',
+            inactiveAssetPath: 'assets/icon/ai_un.png',
+            label: '梨쀫큸',
             active: _selectedBottomNavIndex == 2,
             onTap: _openChatHome,
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Line_up.png',
-            label: '케어',
+            activeAssetPath: 'assets/icon/care.png',
+            inactiveAssetPath: 'assets/icon/care_un.png',
+            label: '耳??,
             active: _selectedBottomNavIndex == 3,
             onTap: () => setState(() {
               _selectedBottomNavIndex = 3;
@@ -2973,9 +2733,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
             }),
           ),
           (
-            icon: null,
-            assetPath: 'assets/icon/Chart.png',
-            label: '메뉴',
+            activeAssetPath: 'assets/icon/menu.png',
+            inactiveAssetPath: 'assets/icon/menu_un.png',
+            label: '硫붾돱',
             active: _selectedBottomNavIndex == 4,
             onTap: () => setState(() {
               _selectedBottomNavIndex = 4;
@@ -3008,29 +2768,22 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        item.assetPath != null
-                            ? _BottomNavAssetIcon(
-                                assetPath: item.assetPath!,
-                                active: item.active,
-                              )
-                            : Icon(
-                                item.icon,
-                                size: 18,
-                                color: item.active
-                                    ? const Color(0xFF1F1B1A)
-                                    : Colors.black.withValues(alpha: 0.42),
-                              ),
+                        _BottomNavAssetIcon(
+                          assetPath: item.active
+                              ? item.activeAssetPath
+                              : item.inactiveAssetPath,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           item.label,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: item.active
-                                ? FontWeight.w700
-                                : FontWeight.w500,
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                             color: item.active
-                                ? const Color(0xFF1F1B1A)
-                                : Colors.black.withValues(alpha: 0.42),
+                                ? const Color(0xFF212121)
+                                : const Color(0xFF606C80),
                           ),
                         ),
                       ],
@@ -3071,7 +2824,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ),
               const SizedBox(height: 16),
               const Text(
-                '해결방법을 생각 중이에요',
+                '?닿껐諛⑸쾿???앷컖 以묒씠?먯슂',
                 style: TextStyle(
                   color: Color(0xFFFF937E),
                   fontSize: 18,
@@ -3116,7 +2869,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       );
     }
 
-    // 오디오 녹음 중 화면
+    // ?ㅻ뵒???뱀쓬 以??붾㈃
     if (_isRecordingActive) {
       return SingleChildScrollView(
         child: Padding(
@@ -3145,7 +2898,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    '소리를 듣고 있어요.\n정확한 진단을 위해\n주변 소음을 차단해주세요.',
+                    '?뚮━瑜??ｊ퀬 ?덉뼱??\n?뺥솗??吏꾨떒???꾪빐\n二쇰? ?뚯쓬??李⑤떒?댁＜?몄슂.',
                     style: TextStyle(
                       color: Color(0xFFFF937E),
                       fontSize: 18,
@@ -3159,6 +2912,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
         ),
       );
+    }
+
+    if (isIdle) {
+      return _buildIdleReboIntroPanel();
     }
 
     return SingleChildScrollView(
@@ -3186,14 +2943,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             const SizedBox(height: 20),
             Text(
-              isIdle
-                  ? '안녕하세요, $_displayName님!\n고장·AS 전용 상담사 REBO 에요.\n어떤 문제가 궁금하신가요?'
-                  : _modePresentation.title,
-              style: TextStyle(
-                color: isIdle
-                    ? const Color(0xFF212121)
-                    : const Color(0xFFFF937E),
-                fontSize: isIdle ? 14 : 18,
+              _modePresentation.title,
+              style: const TextStyle(
+                color: Color(0xFFFF937E),
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
                 height: 1.44,
               ),
@@ -3216,7 +2969,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                   SizedBox(width: 5),
                   Text(
-                    '사진/음성으로 더 정확한 진단이 가능해요',
+                    '?ъ쭊/?뚯꽦?쇰줈 ???뺥솗??吏꾨떒??媛?ν빐??,
                     style: TextStyle(
                       color: Color(0xFFEB4C4C),
                       fontSize: 11,
@@ -3226,40 +2979,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ],
               ),
             ),
-            if (isIdle) ...[
-              const SizedBox(height: 24),
-              const Text(
-                '보유 중인 제품으로 접수하기',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 11),
-              Row(
-                children: [
-                  _ReboProductCard(
-                    assetPath: 'assets/icon/home_washing.png',
-                    label: '세탁기',
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 8),
-                  _ReboProductCard(
-                    assetPath: 'assets/icon/home_refrigerator.png',
-                    label: '냉장고',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _ReboProductCard(
-                assetPath: 'assets/icon/home_air.png',
-                label: '에어컨',
-                onTap: () {},
-              ),
-            ],
           ],
         ),
       ),
@@ -3318,14 +3037,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Future<void> _openSettings() {
     return _showSheet(
-      '연결 설정',
+      '?곌껐 ?ㅼ젙',
       StatefulBuilder(
         builder: (ctx, setLocal) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 시연 유저 선택
+            // ?쒖뿰 ?좎? ?좏깮
             Text(
-              '시연 유저',
+              '?쒖뿰 ?좎?',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.60),
                 fontSize: 12,
@@ -3345,10 +3064,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 dropdownColor: const Color(0xFF2C2C2C),
                 underline: const SizedBox.shrink(),
                 style: const TextStyle(color: Colors.white, fontSize: 14),
-                items: _demoUsers.map((u) => DropdownMenuItem(
-                  value: u.$1,
-                  child: Text('${u.$2} (ID ${u.$1})'),
-                )).toList(),
+                items: _demoUsers
+                    .map(
+                      (u) => DropdownMenuItem(
+                        value: u.$1,
+                        child: Text('${u.$2} (ID ${u.$1})'),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) {
                   if (val == null) return;
                   final name = _demoUsers.firstWhere((u) => u.$1 == val).$2;
@@ -3362,7 +3085,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             const SizedBox(height: 20),
             Text(
-              '서버 주소',
+              '?쒕쾭 二쇱냼',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.60),
                 fontSize: 12,
@@ -3371,8 +3094,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             const SizedBox(height: 8),
             Text(
-              '안드로이드 에뮬레이터는 보통 10.0.2.2, iOS 시뮬레이터는 보통 127.0.0.1을 사용합니다. '
-              '실제 휴대폰에서는 같은 Wi-Fi에 있는 PC의 IP 주소를 입력해주세요.',
+              '?덈뱶濡쒖씠???먮??덉씠?곕뒗 蹂댄넻 10.0.2.2, iOS ?쒕??덉씠?곕뒗 蹂댄넻 127.0.0.1???ъ슜?⑸땲?? '
+              '?ㅼ젣 ?대??곗뿉?쒕뒗 媛숈? Wi-Fi???덈뒗 PC??IP 二쇱냼瑜??낅젰?댁＜?몄슂.',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.72),
                 height: 1.45,
@@ -3386,7 +3109,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
               decoration: InputDecoration(
                 fillColor: Colors.white.withValues(alpha: 0.08),
                 hintText: 'http://192.168.0.13:8000',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -3398,7 +3123,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.wifi_find_rounded),
-              label: const Text('백엔드 확인'),
+              label: const Text('諛깆뿏???뺤씤'),
             ),
           ],
         ),
@@ -3408,12 +3133,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Future<void> _openEvidence() {
     return _showSheet(
-      '분석 근거',
+      '遺꾩꽍 洹쇨굅',
       SizedBox(
         height: math.min(MediaQuery.of(context).size.height * 0.58, 480),
         child: SingleChildScrollView(
           child: SelectableText(
-            _latestEvidence ?? '아직 분석 근거가 없습니다.',
+            _latestEvidence ?? '?꾩쭅 遺꾩꽍 洹쇨굅媛 ?놁뒿?덈떎.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.82),
               fontFamily: 'monospace',
@@ -3486,7 +3211,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               SizedBox(
                 width: 68,
                 child: Text(
-                  _selectedImageName ?? '첨부 이미지',
+                  _selectedImageName ?? '泥⑤? ?대?吏',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -3629,26 +3354,26 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildSeverityBadge(int level) {
     const data = {
       1: (
-        emoji: '🟢',
-        label: '자가 해결 가능',
+        emoji: '?윟',
+        label: '?먭? ?닿껐 媛??,
         bg: Color(0xFFE8F5E9),
         fg: Color(0xFF2E7D32),
       ),
       2: (
-        emoji: '🟡',
-        label: '확인 필요',
+        emoji: '?윞',
+        label: '?뺤씤 ?꾩슂',
         bg: Color(0xFFFFF9C4),
         fg: Color(0xFF6D5B00),
       ),
       3: (
-        emoji: '🔴',
-        label: '전문가 필요',
+        emoji: '?뵶',
+        label: '?꾨Ц媛 ?꾩슂',
         bg: Color(0xFFFFEBEE),
         fg: Color(0xFFC62828),
       ),
       4: (
-        emoji: '🚨',
-        label: '긴급',
+        emoji: '?슚',
+        label: '湲닿툒',
         bg: Color(0xFFFFCDD2),
         fg: Color(0xFFB71C1C),
       ),
@@ -3682,11 +3407,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildAgentStepChips(List<Map<String, dynamic>> steps) {
     if (steps.isEmpty) return const SizedBox.shrink();
     const labels = <String, (String, String)>{
-      'search_knowledge_base': ('🔍', '검색'),
-      'ask_user_question': ('❓', '질문'),
-      'initiate_as_booking': ('📅', 'AS 예약'),
-      'connect_human_agent': ('👤', '상담사'),
-      'final_response': ('✅', '판단 완료'),
+      'search_knowledge_base': ('?뵇', '寃??),
+      'ask_user_question': ('??, '吏덈Ц'),
+      'initiate_as_booking': ('?뱟', 'AS ?덉빟'),
+      'connect_human_agent': ('?뫀', '?곷떞??),
+      'final_response': ('??, '?먮떒 ?꾨즺'),
     };
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -3695,7 +3420,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         runSpacing: 4,
         children: steps.map((step) {
           final action = step['action']?.toString() ?? '';
-          final info = labels[action] ?? ('⚙️', action);
+          final info = labels[action] ?? ('?숋툘', action);
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -3755,7 +3480,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    isUser ? '고객' : 'AI',
+                    isUser ? '怨좉컼' : 'AI',
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.black.withValues(alpha: 0.42),
@@ -3838,7 +3563,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            imageName ?? '첨부 이미지',
+                            imageName ?? '泥⑤? ?대?吏',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -3870,17 +3595,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
     );
   }
 
-  /// 텍스트를 번호 단계로 파싱해 이미지를 각 단계 뒤에 배치한 위젯 목록 반환
+  /// ?띿뒪?몃? 踰덊샇 ?④퀎濡??뚯떛???대?吏瑜?媛??④퀎 ?ㅼ뿉 諛곗튂???꾩젽 紐⑸줉 諛섑솚
   List<Widget> _buildInlineContent(
     String message, {
     required TextStyle baseStyle,
     List<String> images = const [],
   }) {
-    // ── [이미지N] 마커 기반 모드 (Method 1: vision 매핑 결과) ──────────────
-    final markerRegex = RegExp(r'\[이미지(\d+)\]');
+    // ?? [?대?吏N] 留덉빱 湲곕컲 紐⑤뱶 (Method 1: vision 留ㅽ븨 寃곌낵) ??????????????
+    final markerRegex = RegExp(r'\[?대?吏(\d+)\]');
     if (images.isNotEmpty && markerRegex.hasMatch(message)) {
       final widgets = <Widget>[];
-      // 마커를 구분자로 분리
+      // 留덉빱瑜?援щ텇?먮줈 遺꾨━
       final segments = message.split(markerRegex);
       final markerMatches = markerRegex.allMatches(message).toList();
       for (int i = 0; i < segments.length; i++) {
@@ -3897,10 +3622,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
           );
         }
-        // 이 세그먼트 뒤에 마커가 있으면 해당 이미지 삽입
+        // ???멸렇癒쇳듃 ?ㅼ뿉 留덉빱媛 ?덉쑝硫??대떦 ?대?吏 ?쎌엯
         if (i < markerMatches.length) {
           final imgNum = int.tryParse(markerMatches[i].group(1) ?? '') ?? 0;
-          final imgIdx = imgNum - 1; // 1-indexed → 0-indexed
+          final imgIdx = imgNum - 1; // 1-indexed ??0-indexed
           if (imgIdx >= 0 && imgIdx < images.length) {
             widgets.add(const SizedBox(height: 8));
             widgets.add(_buildInlineImage(images[imgIdx]));
@@ -3911,7 +3636,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       return widgets;
     }
 
-    // ── 기존 순서 기반 모드 (fallback) ────────────────────────────────────
+    // ?? 湲곗〈 ?쒖꽌 湲곕컲 紐⑤뱶 (fallback) ????????????????????????????????????
     final stepRegex = RegExp(r'(?=\n\d+[.)]\s)', multiLine: true);
     final parts = message.split(stepRegex);
 
@@ -3950,7 +3675,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
       );
 
-      // 두 번째 단계부터 이미지 삽입 (첫 번째는 intro 텍스트)
+      // ??踰덉㎏ ?④퀎遺???대?吏 ?쎌엯 (泥?踰덉㎏??intro ?띿뒪??
       if (i >= 1 && imgIndex < images.length) {
         widgets.add(const SizedBox(height: 8));
         widgets.add(_buildInlineImage(images[imgIndex]));
@@ -4064,7 +3789,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            _isCheckingConnection ? '백엔드 확인 중' : _serverStatus,
+                            _isCheckingConnection ? '諛깆뿏???뺤씤 以? : _serverStatus,
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 10,
@@ -4080,7 +3805,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 spacing: 4,
                 children: [
                   _HeroActionButton(
-                    tooltip: _autoSpeak ? '음성 읽기 끄기' : '음성 읽기 켜기',
+                    tooltip: _autoSpeak ? '?뚯꽦 ?쎄린 ?꾧린' : '?뚯꽦 ?쎄린 耳쒓린',
                     icon: _autoSpeak
                         ? Icons.volume_up_rounded
                         : Icons.volume_off_rounded,
@@ -4093,17 +3818,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     },
                   ),
                   _HeroActionButton(
-                    tooltip: '연결 설정',
+                    tooltip: '?곌껐 ?ㅼ젙',
                     icon: Icons.tune_rounded,
                     onPressed: _openSettings,
                   ),
                   _HeroActionButton(
-                    tooltip: '분석 근거',
+                    tooltip: '遺꾩꽍 洹쇨굅',
                     icon: Icons.data_object_rounded,
                     onPressed: _latestEvidence == null ? null : _openEvidence,
                   ),
                   _HeroActionButton(
-                    tooltip: '대화 초기화',
+                    tooltip: '???珥덇린??,
                     icon: Icons.refresh_rounded,
                     onPressed: _resetConversation,
                   ),
@@ -4168,9 +3893,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Widget _buildStarterPanel() {
     final suggestions = <String>[
-      '냉장고에서 덜컹거리는 소리가 나요.',
-      '세탁기 탈수 중에 심하게 흔들리고 쿵쿵거려요.',
-      '에어컨에서 물 떨어지는 소리와 함께 냄새가 나요.',
+      '?됱옣怨좎뿉???쒖뻘嫄곕━???뚮━媛 ?섏슂.',
+      '?명긽湲??덉닔 以묒뿉 ?ы븯寃??붾뱾由ш퀬 荑듭영嫄곕젮??',
+      '?먯뼱而⑥뿉??臾??⑥뼱吏???뚮━? ?④퍡 ?꾩깉媛 ?섏슂.',
     ];
 
     return Container(
@@ -4191,7 +3916,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                '빠르게 시작하기',
+                '鍮좊Ⅴ寃??쒖옉?섍린',
                 style: TextStyle(
                   color: _modePresentation.accent,
                   fontSize: 11,
@@ -4201,7 +3926,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             const SizedBox(height: 12),
             const Text(
-              '자주 묻는 증상',
+              '?먯＜ 臾삳뒗 利앹긽',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
@@ -4240,11 +3965,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '+ 버튼으로 할 수 있는 일',
+                    '+ 踰꾪듉?쇰줈 ?????덈뒗 ??,
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                   SizedBox(height: 10),
-                  Text('사진 촬영, 갤러리 가져오기, 음성 녹음, 음성 파일 가져오기를 한 번에 열 수 있어요.'),
+                  Text('?ъ쭊 珥ъ쁺, 媛ㅻ윭由?媛?몄삤湲? ?뚯꽦 ?뱀쓬, ?뚯꽦 ?뚯씪 媛?몄삤湲곕? ??踰덉뿉 ?????덉뼱??'),
                 ],
               ),
             ),
@@ -4286,43 +4011,43 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   static const _asCategories = [
-    '양문형 냉장고',
-    '일반형 냉장고',
-    '상냉장 / 하냉동',
-    '정수기형 냉장고',
-    '스탠드형 김치냉장고',
-    '뚜껑형 김치냉장고',
-    '와인셀러',
+    '?묐Ц???됱옣怨?,
+    '?쇰컲???됱옣怨?,
+    '?곷깋??/ ?섎깋??,
+    '?뺤닔湲고삎 ?됱옣怨?,
+    '?ㅽ깲?쒗삎 源移섎깋?κ퀬',
+    '?쒓퍚??源移섎깋?κ퀬',
+    '??몄???,
   ];
 
   bool _isAfterCategoryOrSerial(String userMsg) {
-    if (userMsg.startsWith('시리얼 넘버:')) return true;
+    if (userMsg.startsWith('?쒕━???섎쾭:')) return true;
     return _asCategories.any((cat) => userMsg.trim() == cat);
   }
 
   static const _asRequestKeywords = [
     'as',
     'a/s',
-    'as신청',
-    'a/s신청',
-    'as 신청',
-    'a/s 신청',
-    '서비스신청',
-    '서비스 신청',
-    '수리신청',
-    '수리 신청',
-    '출장신청',
-    '출장 신청',
-    '출장서비스',
-    '출장 서비스',
-    '기사신청',
-    '기사 신청',
-    '방문수리',
-    '방문 수리',
-    '수리요청',
-    '수리 요청',
-    'as요청',
-    'as 요청',
+    'as?좎껌',
+    'a/s?좎껌',
+    'as ?좎껌',
+    'a/s ?좎껌',
+    '?쒕퉬?ㅼ떊泥?,
+    '?쒕퉬???좎껌',
+    '?섎━?좎껌',
+    '?섎━ ?좎껌',
+    '異쒖옣?좎껌',
+    '異쒖옣 ?좎껌',
+    '異쒖옣?쒕퉬??,
+    '異쒖옣 ?쒕퉬??,
+    '湲곗궗?좎껌',
+    '湲곗궗 ?좎껌',
+    '諛⑸Ц?섎━',
+    '諛⑸Ц ?섎━',
+    '?섎━?붿껌',
+    '?섎━ ?붿껌',
+    'as?붿껌',
+    'as ?붿껌',
   ];
 
   bool _isAsRequestMessage(String msg) {
@@ -4367,7 +4092,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         const SizedBox(height: 16),
         const Text(
-          'AS 신청이 필요하시군요!\n그 전에 자가점검은 어떠신가요?',
+          'AS ?좎껌???꾩슂?섏떆援곗슂!\n洹??꾩뿉 ?먭??먭?? ?대뼚?좉???',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 18,
@@ -4377,7 +4102,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          '아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
+          '?꾩쭅 ?먭??먭????대낫吏 ?딆쑝?⑤떎硫? ???④퀎瑜??곗꽑 異붿쿇?쒕젮?? ?먭??먭????듯빐 ?닿껐??媛?ν븳 臾몄젣瑜??뺢퀬, ?꾩슂??AS ?곗씠?곕? ?먮룞?쇰줈 ?곷떞???뱀? 湲곗궗?섍퍡 ?꾪빐?쒕젮??',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 14,
@@ -4387,7 +4112,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         const SizedBox(height: 16),
         const Text(
-          '어떤 해결방법으로 진행하시겠어요?',
+          '?대뼡 ?닿껐諛⑸쾿?쇰줈 吏꾪뻾?섏떆寃좎뼱??',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 13,
@@ -4399,11 +4124,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            chip('자가점검', () {
+            chip('?먭??먭?', () {
               setState(() {
                 _history = [
                   ..._history,
-                  const ChatTurn(user: '자가점검', assistant: '__SELF_CHECK__'),
+                  const ChatTurn(user: '?먭??먭?', assistant: '__SELF_CHECK__'),
                 ];
               });
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -4415,12 +4140,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
               });
             }),
             const SizedBox(width: 6),
-            chip('서비스 전문 상담', () {
+            chip('?쒕퉬???꾨Ц ?곷떞', () {
               setState(() {
                 _history = [
                   ..._history,
                   const ChatTurn(
-                    user: '서비스 전문 상담',
+                    user: '?쒕퉬???꾨Ц ?곷떞',
                     assistant: '__SERVICE_CONSULT__',
                   ),
                 ];
@@ -4434,12 +4159,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
               });
             }),
             const SizedBox(width: 6),
-            chip('출장 서비스 예약', () {
+            chip('異쒖옣 ?쒕퉬???덉빟', () {
               setState(() {
                 _history = [
                   ..._history,
                   const ChatTurn(
-                    user: '출장 서비스 예약',
+                    user: '異쒖옣 ?쒕퉬???덉빟',
                     assistant: '__VISIT_SERVICE__',
                   ),
                 ];
@@ -4463,7 +4188,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: const [
         Text(
-          '자가점검을 도와드릴게요!',
+          '?먭??먭????꾩??쒕┫寃뚯슂!',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 18,
@@ -4473,7 +4198,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         SizedBox(height: 8),
         Text(
-          '자가점검하는 방법은 다음과 같습니다.\n우선, 현재 수리가 필요한 제품의 카테고리 혹은 제품명과 함께 에러코드, 문제상황을 알려주세요.',
+          '?먭??먭??섎뒗 諛⑸쾿? ?ㅼ쓬怨?媛숈뒿?덈떎.\n?곗꽑, ?꾩옱 ?섎━媛 ?꾩슂???쒗뭹??移댄뀒怨좊━ ?뱀? ?쒗뭹紐낃낵 ?④퍡 ?먮윭肄붾뱶, 臾몄젣?곹솴???뚮젮二쇱꽭??',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 14,
@@ -4490,7 +4215,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '서비스 전문 상담을 도와드릴게요!',
+          '?쒕퉬???꾨Ц ?곷떞???꾩??쒕┫寃뚯슂!',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 16,
@@ -4500,7 +4225,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '서비스 전문 상담을 예약하실 수 있도록 도와드리겠습니다. 다음 링크를 통해 서비스 전문 상담을 진행하실 수 있어요.',
+          '?쒕퉬???꾨Ц ?곷떞???덉빟?섏떎 ???덈룄濡??꾩??쒕━寃좎뒿?덈떎. ?ㅼ쓬 留곹겕瑜??듯빐 ?쒕퉬???꾨Ц ?곷떞??吏꾪뻾?섏떎 ???덉뼱??',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 14,
@@ -4511,7 +4236,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () {
-            _messageController.text = '서비스 전문 상담';
+            _messageController.text = '?쒕퉬???꾨Ц ?곷떞';
             _sendMessage();
           },
           child: Container(
@@ -4522,7 +4247,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
             ),
             child: const Text(
-              '서비스 전문 상담',
+              '?쒕퉬???꾨Ц ?곷떞',
               style: TextStyle(
                 color: Color(0xFFEB4C4C),
                 fontSize: 12,
@@ -4541,7 +4266,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '출장 서비스 예약을 도와드릴게요!',
+          '異쒖옣 ?쒕퉬???덉빟???꾩??쒕┫寃뚯슂!',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 16,
@@ -4551,7 +4276,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '출장 서비스 예약을 예약하실 수 있도록 도와드리겠습니다. 다음 링크를 통해 출장 서비스 예약을 진행하실 수 있어요.',
+          '異쒖옣 ?쒕퉬???덉빟???덉빟?섏떎 ???덈룄濡??꾩??쒕━寃좎뒿?덈떎. ?ㅼ쓬 留곹겕瑜??듯빐 異쒖옣 ?쒕퉬???덉빟??吏꾪뻾?섏떎 ???덉뼱??',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 14,
@@ -4562,7 +4287,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () {
-            _messageController.text = '출장 서비스 예약';
+            _messageController.text = '異쒖옣 ?쒕퉬???덉빟';
             _sendMessage();
           },
           child: Container(
@@ -4573,7 +4298,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
             ),
             child: const Text(
-              '출장 서비스 예약',
+              '異쒖옣 ?쒕퉬???덉빟',
               style: TextStyle(
                 color: Color(0xFFEB4C4C),
                 fontSize: 12,
@@ -4612,13 +4337,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   void _showCategorySheet() {
     const categories = [
-      '양문형 냉장고',
-      '일반형 냉장고',
-      '상냉장 / 하냉동',
-      '정수기형 냉장고',
-      '스탠드형 김치냉장고',
-      '뚜껑형 김치냉장고',
-      '와인셀러',
+      '?묐Ц???됱옣怨?,
+      '?쇰컲???됱옣怨?,
+      '?곷깋??/ ?섎깋??,
+      '?뺤닔湲고삎 ?됱옣怨?,
+      '?ㅽ깲?쒗삎 源移섎깋?κ퀬',
+      '?쒓퍚??源移섎깋?κ퀬',
+      '??몄???,
     ];
 
     showModalBottomSheet<void>(
@@ -4639,7 +4364,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '세부 카테고리 선택',
+                  '?몃? 移댄뀒怨좊━ ?좏깮',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -4648,7 +4373,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  '수현님의 냉장고를 선택해주세요.',
+                  '?섑쁽?섏쓽 ?됱옣怨좊? ?좏깮?댁＜?몄슂.',
                   style: TextStyle(fontSize: 13, color: Color(0xFF5D5B5B)),
                 ),
                 const SizedBox(height: 16),
@@ -4718,7 +4443,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '시리얼 넘버(S/N) 입력',
+                  '?쒕━???섎쾭(S/N) ?낅젰',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -4727,7 +4452,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '제품 뒷면 또는 측면 스티커에서 확인할 수 있어요.',
+                  '?쒗뭹 ?룸㈃ ?먮뒗 痢〓㈃ ?ㅽ떚而ㅼ뿉???뺤씤?????덉뼱??',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.black.withValues(alpha: 0.52),
@@ -4738,7 +4463,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   controller: controller,
                   autofocus: true,
                   decoration: InputDecoration(
-                    hintText: 'S/N 번호를 입력하세요',
+                    hintText: 'S/N 踰덊샇瑜??낅젰?섏꽭??,
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.symmetric(
@@ -4772,7 +4497,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       final sn = controller.text.trim();
                       if (sn.isNotEmpty) {
                         Navigator.of(sheetContext).pop();
-                        _messageController.text = '시리얼 넘버: $sn';
+                        _messageController.text = '?쒕━???섎쾭: $sn';
                         _sendMessage();
                       }
                     },
@@ -4784,7 +4509,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       ),
                     ),
                     child: const Text(
-                      '입력 완료',
+                      '?낅젰 ?꾨즺',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -4805,7 +4530,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
       children: [
-        // 새 채팅 유도 배너
+        // ??梨꾪똿 ?좊룄 諛곕꼫
         GestureDetector(
           onTap: _resetConversation,
           child: Container(
@@ -4828,7 +4553,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    '다른 증상을 진단하려면 새 채팅을 시작하세요',
+                    '?ㅻⅨ 利앹긽??吏꾨떒?섎젮硫???梨꾪똿???쒖옉?섏꽭??,
                     style: TextStyle(
                       fontSize: 12,
                       color: Color(0xFFFF937E),
@@ -4837,7 +4562,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ),
                 const Text(
-                  '새 채팅 →',
+                  '??梨꾪똿 ??,
                   style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFFFF937E),
@@ -4886,7 +4611,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ],
               _buildBubble(
                 index == _streamingTurnIndex
-                    ? '$_streamingText▌'
+                    ? '$_streamingText??
                     : _history[index].assistant,
                 isUser: false,
                 assistantImages: index == _streamingTurnIndex
@@ -4894,7 +4619,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     : _history[index].assistantImages,
               ),
             ],
-            // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
+            // 留덉?留??묐떟?닿퀬, ?띿뒪?몃쭔 ?낅젰??寃쎌슦(?대?吏/?ㅻ뵒???놁쓬) ?쒖븞 移??쒖떆
             if (index == _history.length - 1 &&
                 !_isSubmitting &&
                 _serviceRoutingStep == ServiceRoutingStep.none &&
@@ -4905,8 +4630,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 _history[index].assistant != '__VISIT_SERVICE__') ...[
               const SizedBox(height: 12),
               if (_isAfterCategoryOrSerial(_history[index].user)) ...[
-                // AS 안내 텍스트
-                Container(
+                // AS ?덈궡 ?띿뒪??                Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   margin: const EdgeInsets.only(bottom: 10),
@@ -4915,7 +4639,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Text(
-                    'AS 신청이 필요하시군요!\n아직 자가점검을 해보지 않으셨다면, 이 단계를 우선 추천드려요. 자가점검을 통해 해결이 가능한 문제를 돕고, 필요한 AS 데이터를 자동으로 상담원 혹은 기사님께 전해드려요.',
+                    'AS ?좎껌???꾩슂?섏떆援곗슂!\n?꾩쭅 ?먭??먭????대낫吏 ?딆쑝?⑤떎硫? ???④퀎瑜??곗꽑 異붿쿇?쒕젮?? ?먭??먭????듯빐 ?닿껐??媛?ν븳 臾몄젣瑜??뺢퀬, ?꾩슂??AS ?곗씠?곕? ?먮룞?쇰줈 ?곷떞???뱀? 湲곗궗?섍퍡 ?꾪빐?쒕젮??',
                     style: TextStyle(
                       fontSize: 13,
                       color: Color(0xFF5D5B5B),
@@ -4928,20 +4652,20 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   runSpacing: 8,
                   children: [
                     _buildSuggestionChip(
-                      '상담사 연결',
+                      '?곷떞???곌껐',
                       onTap: () {
-                        _messageController.text = '상담사 연결해줘';
+                        _messageController.text = '?곷떞???곌껐?댁쨾';
                         _sendMessage();
                       },
                     ),
                     _buildSuggestionChip(
-                      'A/S 신청',
+                      'A/S ?좎껌',
                       onTap: () {
                         setState(() {
                           _history = [
                             ..._history,
                             const ChatTurn(
-                              user: 'A/S 신청',
+                              user: 'A/S ?좎껌',
                               assistant: '__AS_ROUTING__',
                             ),
                           ];
@@ -4963,11 +4687,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   runSpacing: 8,
                   children: [
                     _buildSuggestionChip(
-                      '세부 카테고리 선택',
+                      '?몃? 移댄뀒怨좊━ ?좏깮',
                       onTap: _showCategorySheet,
                     ),
                     _buildSuggestionChip(
-                      '시리얼 넘버(S/N) 찾기',
+                      '?쒕━???섎쾭(S/N) 李얘린',
                       onTap: _showSerialNumberSheet,
                     ),
                   ],
@@ -5021,14 +4745,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     const SizedBox(height: 16),
                     Text(
                       hasImage
-                          ? '사진을 분석 중이에요\n정확한 진단을 위해 조금만 기다려주세요'
+                          ? '?ъ쭊??遺꾩꽍 以묒씠?먯슂\n?뺥솗??吏꾨떒???꾪빐 議곌툑留?湲곕떎?ㅼ＜?몄슂'
                           : _agentStepIndex == 0
-                          ? '증상을 분류하고 있어요\n잠시만 기다려주세요'
+                          ? '利앹긽??遺꾨쪟?섍퀬 ?덉뼱??n?좎떆留?湲곕떎?ㅼ＜?몄슂'
                           : _agentStepIndex == 1
-                          ? '원인을 분석하고 있어요\n잠시만 기다려주세요'
+                          ? '?먯씤??遺꾩꽍?섍퀬 ?덉뼱??n?좎떆留?湲곕떎?ㅼ＜?몄슂'
                           : _agentStepIndex == 2
-                          ? '심각도를 판단하고 있어요\n잠시만 기다려주세요'
-                          : '해결책을 준비하고 있어요\n잠시만 기다려주세요',
+                          ? '?ш컖?꾨? ?먮떒?섍퀬 ?덉뼱??n?좎떆留?湲곕떎?ㅼ＜?몄슂'
+                          : '?닿껐梨낆쓣 以鍮꾪븯怨??덉뼱??n?좎떆留?湲곕떎?ㅼ＜?몄슂',
                       style: const TextStyle(
                         color: Color(0xFFFF937E),
                         fontSize: 18,
@@ -5121,12 +4845,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
         children: [
           if (_serviceRoutingStep == ServiceRoutingStep.askDiagnosis) ...[
             const Text(
-              'AI 진단을 먼저 해보시겠어요?',
+              'AI 吏꾨떒??癒쇱? ?대낫?쒓쿋?댁슂?',
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
-              '증상을 먼저 확인하면 더 알맞은 다음 도움을 드릴 수 있어요.',
+              '利앹긽??癒쇱? ?뺤씤?섎㈃ ???뚮쭪? ?ㅼ쓬 ?꾩????쒕┫ ???덉뼱??',
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.4,
@@ -5135,7 +4859,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
             ),
             const SizedBox(height: 6),
             Text(
-              '바로 연결을 원하시면 아래에서 선택하고, 먼저 상태를 확인하고 싶으면 AI 진단을 시작해보세요.',
+              '諛붾줈 ?곌껐???먰븯?쒕㈃ ?꾨옒?먯꽌 ?좏깮?섍퀬, 癒쇱? ?곹깭瑜??뺤씤?섍퀬 ?띠쑝硫?AI 吏꾨떒???쒖옉?대낫?몄슂.',
               style: TextStyle(
                 fontSize: 11.5,
                 height: 1.4,
@@ -5155,7 +4879,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       backgroundColor: const Color(0xFFFFECE8),
                       foregroundColor: const Color(0xFF9C3F36),
                     ),
-                    child: const Text('예'),
+                    child: const Text('??),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -5174,14 +4898,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         color: Colors.black.withValues(alpha: 0.12),
                       ),
                     ),
-                    child: const Text('아니오'),
+                    child: const Text('?꾨땲??),
                   ),
                 ),
               ],
             ),
           ] else ...[
             const Text(
-              '필요한 도움을 선택해보세요.',
+              '?꾩슂???꾩????좏깮?대낫?몄슂.',
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
@@ -5191,9 +4915,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   child: FilledButton.tonalIcon(
                     onPressed: _isSubmitting
                         ? null
-                        : () => _handleServiceActionSelection('상담사 연결'),
+                        : () => _handleServiceActionSelection('?곷떞???곌껐'),
                     icon: const Icon(Icons.support_agent_rounded, size: 18),
-                    label: const Text('상담사 연결'),
+                    label: const Text('?곷떞???곌껐'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: const Color(0xFFFFECE8),
@@ -5206,12 +4930,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   child: FilledButton.tonalIcon(
                     onPressed: _isSubmitting
                         ? null
-                        : () => _handleServiceActionSelection('출장서비스 예약'),
+                        : () => _handleServiceActionSelection('異쒖옣?쒕퉬???덉빟'),
                     icon: const Icon(
                       Icons.home_repair_service_rounded,
                       size: 18,
                     ),
-                    label: const Text('출장서비스 예약'),
+                    label: const Text('異쒖옣?쒕퉬???덉빟'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: const Color(0xFFFFF3E8),
@@ -5232,7 +4956,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     vertical: 4,
                   ),
                 ),
-                child: const Text('먼저 AI 진단해보기'),
+                child: const Text('癒쇱? AI 吏꾨떒?대낫湲?),
               ),
             ),
           ],
@@ -5241,139 +4965,357 @@ class _MobileHomePageState extends State<MobileHomePage> {
     );
   }
 
-  Widget _buildComposer() {
-    final chips = _buildAttachmentChips();
-    final showMicAction = !_canSend && !_isSubmitting;
+  Widget _buildChatTopNavigation() {
+    final canResetConversation =
+        _history.isNotEmpty ||
+        _messageController.text.trim().isNotEmpty ||
+        _selectedImage != null ||
+        _selectedAudio != null ||
+        _recordedVoice != null ||
+        _recordedNoise != null;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(19, 8, 19, 12),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (chips.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(spacing: 6, runSpacing: 6, children: chips),
+    return SizedBox(
+      height: 40,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          PopupMenuButton<String>(
+            tooltip: '',
+            padding: EdgeInsets.zero,
+            offset: const Offset(0, 34),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            color: Colors.white,
+            elevation: 10,
+            onSelected: (_) => _returnToWelcomeScreen(),
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'thinq',
+                child: Text(
+                  'ChatThinQ',
+                  style: TextStyle(
+                    color: Color(0xFF212121),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Pretendard',
+                  ),
                 ),
               ),
-            _isRecordingActive
-                ? _buildRecordingComposer()
-                : Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+            ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Chat REBO',
+                  style: TextStyle(
+                    color: Color(0xFF212121),
+                    fontSize: 20,
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Pretendard',
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Image.asset(
+                  'assets/icon/down.png',
+                  width: 18,
+                  height: 18,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ChatTopNavigationAssetButton(
+                assetPath: 'assets/icon/home_plus.png',
+                tooltip: '새 대화',
+                onTap: _isSubmitting || !canResetConversation
+                    ? null
+                    : () => unawaited(_resetConversation()),
+              ),
+              const SizedBox(width: 8),
+              _ChatTopNavigationAssetButton(
+                assetPath: 'assets/icon/chat_arhive.png',
+                tooltip: '보관함',
+                onTap: _openArchiveScreen,
+              ),
+              const SizedBox(width: 8),
+              _ChatTopNavigationAssetButton(
+                assetPath: 'assets/icon/close.png',
+                tooltip: '닫기',
+                onTap: _returnToWelcomeScreen,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatFooterNotice() {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'AI가 생성한 응답은 부정확할 수 있습니다.',
+            style: TextStyle(
+              color: Color(0xFF5D5B5B),
+              fontSize: 10,
+              height: 1.2,
+              fontWeight: FontWeight.w400,
+              fontFamily: 'Pretendard',
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: _openSettings,
+            child: const Text(
+              '더보기',
+              style: TextStyle(
+                color: Color(0xFF5D5B5B),
+                fontSize: 10,
+                height: 1.2,
+                fontWeight: FontWeight.w400,
+                decoration: TextDecoration.underline,
+                fontFamily: 'Pretendard',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdleReboIntroPanel() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              _characterAssetForMode(AssistantMode.maincharacter),
+              width: 165,
+              height: 165,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 28),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '안녕하세요, ' + _displayName + '님!\n고장·AS 전용 상담사 REBO 에요.\n어떤 문제가 궁금하신가요?',
+                    style: const TextStyle(
+                      color: Color(0xFF212121),
+                      fontSize: 18,
+                      height: 1.44,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Pretendard',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      gradient: const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Color(0xFFFF937E), Color(0xFFFF5555)],
+                      ),
                       borderRadius: BorderRadius.circular(999),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0DFD312E),
-                          blurRadius: 8,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(1.2),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                      ],
+                        padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/icon/AI.png',
+                              width: 16,
+                              height: 16,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                            const SizedBox(width: 6),
+                            const Flexible(
+                              child: Text(
+                                '사진/음성으로 더 정확한 진단이 가능해요',
+                                style: TextStyle(
+                                  color: Color(0xFFEB4C4C),
+                                  fontSize: 14,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w400,
+                                  fontFamily: 'Pretendard',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '보유 중인 제품으로 접수하기',
+                    style: TextStyle(
+                      color: Color(0xFF212121),
+                      fontSize: 18,
+                      height: 1.44,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Pretendard',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 154,
+                    height: 49,
+                    padding: const EdgeInsets.only(left: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0x0D212121),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        GestureDetector(
-                          onTap: _isSubmitting ? null : _openAttachmentSheet,
-                          child: Image.asset(
-                            'assets/icon/home_plus.png',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            color: _isSubmitting
-                                ? const Color(0xFF606C80).withValues(alpha: 0.4)
-                                : const Color(0xFF606C80),
-                            colorBlendMode: BlendMode.srcIn,
-                          ),
+                        Image.asset(
+                          'assets/icon/home_plus.png',
+                          width: 20,
+                          height: 20,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
                         ),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            enabled: !_isSubmitting,
-                            minLines: 1,
-                            maxLines: 4,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              height: 1.45,
-                              color: Color(0xFF212121),
-                            ),
-                            decoration: InputDecoration(
-                              hintText: _modePresentation.hintText,
-                              hintStyle: const TextStyle(
-                                fontSize: 12.5,
-                                height: 1.15,
-                                color: Color(0xFF5D5B5B),
-                                fontWeight: FontWeight.w400,
-                                fontFamily: 'Pretendard',
-                              ),
-                              filled: false,
-                              fillColor: Colors.transparent,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 0,
-                                vertical: 0,
-                              ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                            ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          '제품 등록하기',
+                          style: TextStyle(
+                            color: Color(0xFF212121),
+                            fontSize: 14,
+                            height: 1.15,
+                            fontWeight: FontWeight.w400,
+                            fontFamily: 'Pretendard',
                           ),
-                        ),
-                        const SizedBox(width: 7),
-                        GestureDetector(
-                          onTap: _isSubmitting ? null : _handleMicTap,
-                          child: Image.asset(
-                            'assets/icon/mic.png',
-                            width: 22,
-                            height: 22,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                            color: _isSubmitting
-                                ? const Color(0xFF606C80).withValues(alpha: 0.4)
-                                : const Color(0xFF606C80),
-                            colorBlendMode: BlendMode.srcIn,
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        GestureDetector(
-                          onTap: (_isSubmitting || showMicAction)
-                              ? null
-                              : _sendMessage,
-                          child: _isSubmitting
-                              ? const SizedBox.square(
-                                  dimension: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFFFF937E),
-                                  ),
-                                )
-                              : Image.asset(
-                                  'assets/icon/send.png',
-                                  width: 22,
-                                  height: 22,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.medium,
-                                  color: showMicAction
-                                      ? const Color(0xFF606C80).withValues(
-                                          alpha: 0.35,
-                                        )
-                                      : const Color(0xFFFF937E),
-                                  colorBlendMode: BlendMode.srcIn,
-                                ),
                         ),
                       ],
                     ),
                   ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+  Widget _buildComposer() {
+    final chips = _buildAttachmentChips();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (chips.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(spacing: 6, runSpacing: 6, children: chips),
+            ),
+          ),
+        _isRecordingActive
+            ? _buildRecordingComposer()
+            : Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x0DFD312E), blurRadius: 8),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _isSubmitting ? null : _openAttachmentSheet,
+                      child: Opacity(
+                        opacity: _isSubmitting ? 0.38 : 1,
+                        child: Image.asset(
+                          'assets/icon/home_plus.png',
+                          width: 22,
+                          height: 22,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        enabled: !_isSubmitting,
+                        minLines: 1,
+                        maxLines: 4,
+                        style: const TextStyle(
+                          color: Color(0xFF212121),
+                          fontSize: 12.5,
+                          height: 1.15,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: 'Pretendard',
+                        ),
+                        decoration: InputDecoration(
+                          hintText: _modePresentation.hintText,
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF5D5B5B),
+                            fontSize: 12.5,
+                            height: 1.15,
+                            fontWeight: FontWeight.w400,
+                            fontFamily: 'Pretendard',
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    _TintedAssetComposerButton(
+                      assetPath: 'assets/icon/mic.png',
+                      size: 22,
+                      onTap: _isSubmitting ? null : _handleMicTap,
+                    ),
+                    const SizedBox(width: 7),
+                    _TintedAssetComposerButton(
+                      assetPath: 'assets/icon/send.png',
+                      size: 22,
+                      onTap: _isSubmitting || !_canSend ? null : _sendMessage,
+                    ),
+                  ],
+                ),
+              ),
+      ],
     );
   }
 
@@ -5381,10 +5323,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
     final accent = _isRecordingVoice
         ? const Color(0xFFCA4156)
         : const Color(0xFFE07A00);
-    final title = _isRecordingVoice ? '말하기 녹음 중' : '소음 녹음 중';
+    final title = _isRecordingVoice ? '留먰븯湲??뱀쓬 以? : '?뚯쓬 ?뱀쓬 以?;
     final subtitle = _isRecordingVoice
-        ? '말한 내용을 텍스트로 바꿔요'
-        : '제품 소리를 분석용으로 저장해요';
+        ? '留먰븳 ?댁슜???띿뒪?몃줈 諛붽퓭??
+        : '?쒗뭹 ?뚮━瑜?遺꾩꽍?⑹쑝濡???ν빐??;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -5462,7 +5404,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
           const SizedBox(width: 10),
           _RecordingActionButton(
-            tooltip: '녹음 종료',
+            tooltip: '?뱀쓬 醫낅즺',
             icon: Icons.stop_rounded,
             fillColor: accent.withValues(alpha: 0.12),
             iconColor: accent,
@@ -5470,7 +5412,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
           const SizedBox(width: 8),
           _RecordingActionButton(
-            tooltip: '녹음 취소',
+            tooltip: '?뱀쓬 痍⑥냼',
             icon: Icons.close_rounded,
             fillColor: const Color(0xFFF6F4F2),
             iconColor: Colors.black.withValues(alpha: 0.62),
@@ -5484,115 +5426,23 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildChatScreen() {
     return Scaffold(
       backgroundColor: const Color(0xFFFCEDEB),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        centerTitle: false,
-        toolbarHeight: 40,
-        titleSpacing: 19,
-        title: PopupMenuButton<String>(
-          tooltip: '',
-          padding: EdgeInsets.zero,
-          offset: const Offset(0, 34),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          color: Colors.white,
-          elevation: 10,
-          onSelected: (_) => setState(() => _showWelcomeScreen = true),
-          itemBuilder: (context) => const [
-            PopupMenuItem<String>(
-              value: 'chatthinq',
-              child: Text(
-                'ChatThinQ',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Pretendard',
-                ),
-              ),
-            ),
-          ],
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Chat REBO',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 20,
-                  height: 1.1,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Pretendard',
-                ),
-              ),
-              const SizedBox(width: 6),
-              Image.asset(
-                'assets/icon/down.png',
-                width: 18,
-                height: 18,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          if (_history.isNotEmpty)
-            GestureDetector(
-              onTap: _resetConversation,
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF937E).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: const Text(
-                  '새 채팅',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFFF937E),
-                  ),
-                ),
-              ),
-            ),
-          _TopBarIconButton(
-            tooltip: '보관함',
-            onPressed: _openArchiveScreen,
-            child: const _ArchiveOutlineIcon(),
-          ),
-          const SizedBox(width: 2),
-          _TopBarIconButton(
-            tooltip: '채팅 닫기',
-            onPressed: () => setState(() {
-              _showWelcomeScreen = true;
-              _showArchiveScreen = false;
-            }),
-            child: const _CloseOutlineIcon(),
-          ),
-          const SizedBox(width: 10),
-        ],
-      ),
       body: Stack(
         children: [
           const Positioned.fill(child: ChatThinQBackground()),
           SafeArea(
             child: Column(
               children: [
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 19),
+                  child: _buildChatTopNavigation(),
+                ),
+                const SizedBox(height: 18),
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       16,
-                      _history.isEmpty ? 12 : 4,
+                      _history.isEmpty ? 6 : 0,
                       16,
                       0,
                     ),
@@ -5612,33 +5462,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(19, 4, 19, 0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'AI가 생성한 응답은 부정확할 수 있습니다.',
-                        style: TextStyle(
-                          color: Color(0xFF5D5B5B),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '더보기',
-                        style: TextStyle(
-                          color: Color(0xFF5D5B5B),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
+                  padding: const EdgeInsets.fromLTRB(19, 0, 19, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildChatFooterNotice(),
+                      const SizedBox(height: 12),
+                      _buildComposer(),
                     ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                _buildComposer(),
               ],
             ),
           ),
@@ -5752,57 +5585,6 @@ class _ModePresentation {
   final String hintText;
   final List<Color> gradientColors;
   final Color accent;
-}
-
-class _ReboProductCard extends StatelessWidget {
-  const _ReboProductCard({
-    required this.assetPath,
-    required this.label,
-    required this.onTap,
-  });
-
-  final String assetPath;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 154,
-        height: 49,
-        padding: const EdgeInsets.only(left: 12),
-        decoration: BoxDecoration(
-          color: const Color(0x0D212121),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              assetPath,
-              width: 24,
-              height: 24,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF212121),
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-                height: 1.3,
-                fontFamily: 'Pretendard',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _HeroActionButton extends StatelessWidget {
@@ -6584,13 +6366,13 @@ class _CloseOutlineIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       'assets/icon/chat_close.png',
-      width: 18,
-      height: 18,
+      width: 17,
+      height: 17,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         return SizedBox(
-          width: 18,
-          height: 18,
+          width: 17,
+          height: 17,
           child: CustomPaint(painter: _CloseOutlinePainter()),
         );
       },
@@ -6618,16 +6400,16 @@ class _ArchiveOutlineIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       'assets/icon/chat_arhive.png',
-      width: 18,
-      height: 18,
+      width: 17,
+      height: 17,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         return SizedBox(
-          width: 18,
-          height: 18,
+          width: 17,
+          height: 17,
           child: Icon(
             Icons.inventory_2_outlined,
-            size: 18,
+            size: 17,
             color: const Color(0xFF23201E),
           ),
         );
@@ -6636,23 +6418,113 @@ class _ArchiveOutlineIcon extends StatelessWidget {
   }
 }
 
-class _BottomNavAssetIcon extends StatelessWidget {
-  const _BottomNavAssetIcon({required this.assetPath, required this.active});
+class _ChatTopNavigationAssetButton extends StatelessWidget {
+  const _ChatTopNavigationAssetButton({
+    required this.assetPath,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   final String assetPath;
-  final bool active;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Opacity(
+          opacity: onTap == null ? 0.38 : 1,
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: Image.asset(
+              assetPath,
+              width: 18,
+              height: 18,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TintedAssetComposerButton extends StatefulWidget {
+  const _TintedAssetComposerButton({
+    required this.assetPath,
+    required this.size,
+    required this.onTap,
+  });
+
+  final String assetPath;
+  final double size;
+  final VoidCallback? onTap;
+
+  @override
+  State<_TintedAssetComposerButton> createState() =>
+      _TintedAssetComposerButtonState();
+}
+
+class _TintedAssetComposerButtonState extends State<_TintedAssetComposerButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (!mounted || widget.onTap == null) {
+      return;
+    }
+    setState(() {
+      _pressed = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      child: Opacity(
+        opacity: enabled ? 1 : 0.48,
+        child: SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: Image.asset(
+            widget.assetPath,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            color: _pressed
+                ? const Color(0xFF212121)
+                : const Color(0xFF606C80),
+            colorBlendMode: BlendMode.srcIn,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomNavAssetIcon extends StatelessWidget {
+  const _BottomNavAssetIcon({required this.assetPath});
+
+  final String assetPath;
 
   @override
   Widget build(BuildContext context) {
     return Image.asset(
       assetPath,
-      width: 18,
-      height: 18,
+      width: 24,
+      height: 24,
       fit: BoxFit.contain,
-      color: active
-          ? const Color(0xFF1F1B1A)
-          : Colors.black.withValues(alpha: 0.42),
-      colorBlendMode: BlendMode.srcIn,
+      filterQuality: FilterQuality.medium,
     );
   }
 }
@@ -6732,7 +6604,7 @@ class ChatTurn {
   final String? userImagePath;
   final String? userImageName;
   final List<String> assistantImages;
-  final int? severityLevel; // 1(자가해결) 2(확인필요) 3(전문가) 4(긴급)
+  final int? severityLevel; // 1(?먭??닿껐) 2(?뺤씤?꾩슂) 3(?꾨Ц媛) 4(湲닿툒)
   final String? actionPattern; // "A" | "B" | "C" | "D"
   final List<Map<String, dynamic>> agentSteps; // [{iteration, action, detail}]
 
@@ -6767,3 +6639,4 @@ class ChatTurn {
     );
   }
 }
+

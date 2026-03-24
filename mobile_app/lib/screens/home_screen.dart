@@ -1,160 +1,252 @@
+//홈화면 디자인 수정 완료
 import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.onOpenChatbot});
+
   final VoidCallback onOpenChatbot;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF6F7),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        automaticallyImplyLeading: false,
-        titleSpacing: 19,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  '김수현 홈',
-                  style: TextStyle(
-                    color: Color(0xFF999999),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Pretendard',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: Color(0xFF999999),
-                  size: 20,
-                ),
-              ],
-            ),
-            const Row(
-              children: [
-                Icon(Icons.search, color: Color(0xFF212121), size: 24),
-                SizedBox(width: 8),
-                Icon(Icons.notifications_none, color: Color(0xFF212121), size: 24),
-                SizedBox(width: 8),
-                Icon(Icons.settings_outlined, color: Color(0xFF212121), size: 24),
-              ],
-            ),
-          ],
-        ),
-      ),
       body: Stack(
         children: [
-          // 블러 원 (좌측 상단)
-          Positioned(
-            left: -120,
-            top: 0,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Color(0xFFBFE1DE).withValues(alpha: 0.80),
-                      Color(0xFFBFE1DE).withValues(alpha: 0.0),
-                    ],
+          const Positioned.fill(child: _HomeBackground()),
+          SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 19),
+                  child: _HomeTopNavigation(),
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(19, 0, 19, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _BannerCard(
+                          title: '에어컨 사전 점검 서비스로\n올 여름도 시원하게',
+                          buttonLabel: '사전점검 신청하기',
+                          imagePath: 'assets/icon/home_1.png',
+                        ),
+                        const SizedBox(height: 12),
+                        _BannerCard(
+                          title: 'Chat REBO로 우리집 가전의\n고장을 바로 해결해보세요!',
+                          buttonLabel: 'Chat REBO 사용하기',
+                          imagePath: 'assets/icon/home_2.png',
+                          onPressed: onOpenChatbot,
+                        ),
+                        const SizedBox(height: 24),
+                        const _SectionHeader(
+                          title: '즐겨 찾는 제품',
+                          trailingAssetPath: 'assets/icon/edit.png',
+                        ),
+                        const SizedBox(height: 12),
+                        const _FavoriteProductsSection(),
+                        const SizedBox(height: 24),
+                        const _SectionHeader(
+                          title: '스마트 루틴',
+                          trailingAssetPath: 'assets/icon/Right.png',
+                        ),
+                        const SizedBox(height: 12),
+                        const _RoutineSection(),
+                        const SizedBox(height: 24),
+                        const _SectionHeader(
+                          title: 'ThinQ 활용하기',
+                          trailingAssetPath: 'assets/icon/Right.png',
+                        ),
+                        const SizedBox(height: 12),
+                        const _ThinQInsightCard(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-          // 블러 원 (우측 하단)
-          Positioned(
-            right: -120,
-            bottom: 80,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Color(0xFFBFE1DE).withValues(alpha: 0.80),
-                      Color(0xFFBFE1DE).withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(19, 0, 19, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 10),
-            // Section 1: Banner cards
-            _buildBannerCard(
-              title: '에어컨 사전 점검 서비스로\n올 여름도 시원하게',
-              buttonLabel: '사전점검 신청하기',
-              onTap: null,
-            ),
-            const SizedBox(height: 12),
-            _buildBannerCard(
-              title: 'Chat REBO로 우리집 가전의\n고장을 바로 해결해보세요!',
-              buttonLabel: 'Chat REBO 사용하기',
-              onTap: onOpenChatbot,
-            ),
-            const SizedBox(height: 24),
-            // Section 2: 즐겨 찾는 제품
-            _buildSectionHeader('즐겨 찾는 제품'),
-            const SizedBox(height: 12),
-            _buildProductGrid(),
-            const SizedBox(height: 24),
-            // Section 3: 스마트 루틴
-            _buildSectionHeader('스마트 루틴'),
-            const SizedBox(height: 12),
-            _buildChip('루틴 알아보기'),
-            const SizedBox(height: 24),
-            // Section 4: ThinQ 활용하기
-            _buildSectionHeader('ThinQ 활용하기'),
-            const SizedBox(height: 12),
-            _buildThinQCard(),
-          ],
-        ),
-      ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildBannerCard({
-    required String title,
-    required String buttonLabel,
-    VoidCallback? onTap,
-  }) {
+class _HomeBackground extends StatelessWidget {
+  const _HomeBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const ColoredBox(color: Color(0xFFEDF6F7)),
+        const Positioned(
+          left: -155,
+          top: -110,
+          child: _BlurredOrb(
+            size: 310,
+            color: Color(0xFFBFE1DE),
+            opacity: 0.42,
+            blurSigma: 138,
+          ),
+        ),
+        const Positioned(
+          right: -155,
+          bottom: -110,
+          child: _BlurredOrb(
+            size: 310,
+            color: Color(0xFFBFE1DE),
+            opacity: 0.42,
+            blurSigma: 138,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BlurredOrb extends StatelessWidget {
+  const _BlurredOrb({
+    required this.size,
+    required this.color,
+    required this.opacity,
+    this.blurSigma = 60,
+  });
+
+  final double size;
+  final Color color;
+  final double opacity;
+  final double blurSigma;
+
+  @override
+  Widget build(BuildContext context) {
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withValues(alpha: opacity),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeTopNavigation extends StatelessWidget {
+  const _HomeTopNavigation();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '식스센스 홈',
+                style: TextStyle(
+                  color: Color(0xFF212121),
+                  fontSize: 18,
+                  height: 1.11,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Pretendard',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Image.asset(
+                'assets/icon/down.png',
+                width: 20,
+                height: 20,
+                filterQuality: FilterQuality.medium,
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              _TopIcon(assetPath: 'assets/icon/home_plus.png'),
+              SizedBox(width: 8),
+              _TopIcon(assetPath: 'assets/icon/home_bell.png'),
+              SizedBox(width: 8),
+              _TopIcon(assetPath: 'assets/icon/home_meatballs.png'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopIcon extends StatelessWidget {
+  const _TopIcon({required this.assetPath});
+
+  final String assetPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Center(
+        child: Image.asset(
+          assetPath,
+          width: 24,
+          height: 24,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+        ),
+      ),
+    );
+  }
+}
+
+class _BannerCard extends StatelessWidget {
+  const _BannerCard({
+    required this.title,
+    required this.buttonLabel,
+    required this.imagePath,
+    this.onPressed,
+  });
+
+  final String title;
+  final String buttonLabel;
+  final String imagePath;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       height: 105,
-      padding: const EdgeInsets.only(left: 19),
+      padding: const EdgeInsets.only(left: 19, right: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF9DB7B5).withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Container(
+          Image.asset(
+            imagePath,
             width: 60,
             height: 60,
-            decoration: BoxDecoration(
-              color: const Color(0xFFD9D9D9),
-              borderRadius: BorderRadius.circular(12),
-            ),
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -167,34 +259,13 @@ class HomeScreen extends StatelessWidget {
                   style: const TextStyle(
                     color: Color(0xFF212121),
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
                     height: 1.43,
+                    fontWeight: FontWeight.w500,
                     fontFamily: 'Pretendard',
                   ),
                 ),
                 const SizedBox(height: 6),
-                GestureDetector(
-                  onTap: onTap,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD6DBFC),
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      buttonLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF4D57B9),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        fontFamily: 'Pretendard',
-                      ),
-                    ),
-                  ),
-                ),
+                _ActionChip(label: buttonLabel, onPressed: onPressed),
               ],
             ),
           ),
@@ -202,8 +273,54 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildSectionHeader(String title) {
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({required this.label, this.onPressed});
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD6DBFC),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF4D57B9),
+          fontSize: 12,
+          height: 1.16,
+          fontWeight: FontWeight.w500,
+          fontFamily: 'Pretendard',
+        ),
+      ),
+    );
+
+    if (onPressed == null) {
+      return chip;
+    }
+
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(100),
+      child: chip,
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.trailingAssetPath});
+
+  final String title;
+  final String trailingAssetPath;
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -212,59 +329,104 @@ class HomeScreen extends StatelessWidget {
           style: const TextStyle(
             color: Color(0xFF212121),
             fontSize: 16,
+            height: 1.37,
             fontWeight: FontWeight.w600,
             fontFamily: 'Pretendard',
           ),
         ),
-        const Icon(Icons.add, color: Color(0xFF212121), size: 24),
-      ],
-    );
-  }
-
-  Widget _buildProductGrid() {
-    const products = ['전기레인지', '냉장고', '에어컨', '스타일러'];
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: _buildProductChip(products[0])),
-            const SizedBox(width: 11),
-            Expanded(child: _buildProductChip(products[1])),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(child: _buildProductChip(products[2])),
-            const SizedBox(width: 11),
-            Expanded(child: _buildProductChip(products[3])),
-          ],
+        Image.asset(
+          trailingAssetPath,
+          width: 24,
+          height: 24,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
         ),
       ],
     );
   }
+}
 
-  Widget _buildProductChip(String label) {
+class _FavoriteProductsSection extends StatelessWidget {
+  const _FavoriteProductsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 11) / 2;
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: cardWidth,
+                  child: const _ProductShortcutCard(
+                    label: '세탁기',
+                    imagePath: 'assets/icon/home_washing.png',
+                  ),
+                ),
+                const SizedBox(width: 11),
+                SizedBox(
+                  width: cardWidth,
+                  child: const _ProductShortcutCard(
+                    label: '냉장고',
+                    imagePath: 'assets/icon/home_refrigerator.png',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: cardWidth,
+                child: const _ProductShortcutCard(
+                  label: '에어컨',
+                  imagePath: 'assets/icon/home_air.png',
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProductShortcutCard extends StatelessWidget {
+  const _ProductShortcutCard({required this.label, required this.imagePath});
+
+  final String label;
+  final String imagePath;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       height: 49,
-      padding: const EdgeInsets.only(left: 10),
+      padding: const EdgeInsets.only(left: 12, right: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF212121).withValues(alpha: 0.05),
+        color: const Color(0x0D212121),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         children: [
-          Container(
-            width: 20,
-            height: 20,
-            color: const Color(0xFFD9D9D9),
+          SizedBox(
+            width: 30,
+            height: 30,
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+            ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
             label,
             style: const TextStyle(
               color: Color(0xFF212121),
               fontSize: 14,
+              height: 1.14,
               fontWeight: FontWeight.w400,
               fontFamily: 'Pretendard',
             ),
@@ -273,62 +435,111 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildChip(String label) {
-    return Container(
-      height: 49,
-      width: 163,
-      padding: const EdgeInsets.only(left: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF212121).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            color: const Color(0xFFD9D9D9),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF212121),
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              fontFamily: 'Pretendard',
+class _RoutineSection extends StatelessWidget {
+  const _RoutineSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 11) / 2;
+
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: cardWidth,
+            height: 49,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/icon/time.png',
+                  width: 20,
+                  height: 20,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  '루틴 알아보기',
+                  style: TextStyle(
+                    color: Color(0xFF212121),
+                    fontSize: 14,
+                    height: 1.14,
+                    fontWeight: FontWeight.w400,
+                    fontFamily: 'Pretendard',
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+}
 
-  Widget _buildThinQCard() {
+class _ThinQInsightCard extends StatelessWidget {
+  const _ThinQInsightCard();
+
+  @override
+  Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             height: 129,
-            color: const Color(0xFFD9D9D9),
-            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFF9F5E9), Color(0xFFF3EDD9)],
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  top: 22,
+                  child: Container(
+                    width: 180,
+                    height: 82,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8EA),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                ),
+                Image.asset(
+                  'assets/icon/home_thinq.png',
+                  width: 161,
+                  height: 125,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ],
+            ),
           ),
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(19, 0, 19, 0),
-            height: 70,
             color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(19, 14, 19, 14),
             child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '스마트 진단으로 제품 상태를 확인해요',
+                  '챗봇으로 제품의 고장 원인을 파악해 보세요',
                   style: TextStyle(
                     color: Color(0xFF212121),
-                    fontSize: 16,
+                    fontSize: 15,
+                    height: 1.12,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'Pretendard',
                   ),
@@ -339,6 +550,7 @@ class HomeScreen extends StatelessWidget {
                   style: TextStyle(
                     color: Color(0xFF606C80),
                     fontSize: 12,
+                    height: 1.16,
                     fontWeight: FontWeight.w400,
                     fontFamily: 'Pretendard',
                   ),

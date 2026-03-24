@@ -4,8 +4,7 @@ from datetime import datetime
 import re
 from typing import Any, Dict, List, Optional, Sequence
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func, select
-from sqlalchemy.dialects.mysql import BIGINT, JSON
+from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, String, Text, func, select, text
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from db import Base
@@ -14,13 +13,13 @@ from db import Base
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BIGINT(unsigned=True), nullable=False, index=True)
-    product_id: Mapped[Optional[int]] = mapped_column(BIGINT(unsigned=True), nullable=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    product_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     summary: Mapped[str] = mapped_column(String(500), nullable=False)
     status: Mapped[str] = mapped_column(
-        Enum("active", "resolved", "archived", name="chat_session_status"),
+        String(20),
         nullable=False,
         default="active",
     )
@@ -49,22 +48,15 @@ class ChatSession(Base):
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
-    id: Mapped[int] = mapped_column(BIGINT(unsigned=True), primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
-        BIGINT(unsigned=True),
+        BigInteger,
         ForeignKey("chat_sessions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    role: Mapped[str] = mapped_column(
-        Enum("user", "assistant", "system", name="chat_message_role"),
-        nullable=False,
-    )
-    message_type: Mapped[str] = mapped_column(
-        Enum("text", "image", "audio", "mixed", name="chat_message_type"),
-        nullable=False,
-        default="text",
-    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    message_type: Mapped[str] = mapped_column(String(20), nullable=False, default="text")
     content: Mapped[str] = mapped_column(Text, nullable=False)
     attachments: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     ai_meta: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
