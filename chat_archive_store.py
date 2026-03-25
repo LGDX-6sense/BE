@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
+import json
+import os
 import re
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -8,6 +11,11 @@ from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, String, Text, fun
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from db import Base
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 
 class ChatSession(Base):
@@ -79,6 +87,40 @@ def _truncate(text: str, length: int) -> str:
     return f"{cleaned[: max(0, length - 1)].rstrip()}…"
 
 
+def _truncate_multiline(text: str, length: int, *, max_lines: int = 2) -> str:
+    lines = [_normalize_text(line) for line in str(text or "").splitlines() if _normalize_text(line)]
+    if not lines:
+        return ""
+    lines = lines[:max_lines]
+    compact = "\n".join(lines)
+    if len(compact) <= length:
+        return compact
+
+    remaining = length
+    output: List[str] = []
+    for index, line in enumerate(lines):
+        reserve = 1 if index < len(lines) - 1 else 0
+        allowance = max(0, remaining - reserve)
+        if allowance <= 0:
+            break
+        if len(line) <= allowance:
+            output.append(line)
+            remaining -= len(line) + reserve
+            continue
+        output.append(f"{line[: max(0, allowance - 1)].rstrip()}…")
+        break
+    return "\n".join(output)
+
+
+ARCHIVE_SUMMARY_MODEL = os.getenv(
+    "OPENAI_ARCHIVE_SUMMARY_MODEL",
+    os.getenv("OPENAI_AGENT_MODEL", os.getenv("OPENAI_MODEL", "gpt-4.1-mini")),
+)
+_OPENAI_MODEL_ALIASES = {
+    "gpt-4-mini": "gpt-4.1-mini",
+}
+
+
 def _strip_attachment_lines(text: str) -> str:
     lines: List[str] = []
     for line in str(text or "").splitlines():
@@ -93,6 +135,8 @@ def _strip_attachment_lines(text: str) -> str:
 
 def _clean_assistant_text(text: str) -> str:
     cleaned = _normalize_text(str(text or "").replace("**", " "))
+    for marker in ("__AS_ROUTING__", "__SELF_CHECK__", "__SERVICE_CONSULT__", "__VISIT_SERVICE__"):
+        cleaned = cleaned.replace(marker, " ")
     cleaned = re.sub(r"^[^.!?]*문제를 진단해봤어요!\s*", "", cleaned)
     cleaned = cleaned.replace("현재 증상은 ", "")
     return _normalize_text(cleaned)
@@ -176,21 +220,785 @@ def _extract_solution_line(text: str) -> str:
     return ""
 
 
-def _build_archive_title(latest_user: str, latest_assistant: str, attachment_name: str) -> str:
-    combined = _normalize_text(f"{latest_user} {latest_assistant} {attachment_name}")
-    error_code = _extract_error_code(combined)
-    device = _infer_device_label(combined)
+def _all_history_text(history: Sequence[Dict[str, str]]) -> str:
+    """대화 전체를 하나의 텍스트로 합칩니다."""
+    parts: List[str] = []
+    for turn in history:
+        u = _strip_attachment_lines(turn.get("user", ""))
+        a = _clean_assistant_text(turn.get("assistant", ""))
+        if u:
+            parts.append(u)
+        if a:
+            parts.append(a)
+    return _normalize_text(" ".join(parts))
 
-    if device and error_code:
-        return f"{device} {error_code} 에러 문의"
-    if error_code:
-        return f"{error_code} 에러 문의"
+
+def _trim_phrase(text: str) -> str:
+    return _normalize_text(str(text or "").rstrip(" .,!?:;"))
+
+
+def _ensure_sentence(text: str) -> str:
+    cleaned = _trim_phrase(text)
+    if not cleaned:
+        return ""
+    if cleaned.endswith((".", "!", "?")):
+        return cleaned
+    return f"{cleaned}."
+
+
+def _to_reported_clause(text: str) -> str:
+    cleaned = _trim_phrase(text)
+    if not cleaned:
+        return ""
+
+    special_endings = {
+        "필요합니다": "필요하다고",
+        "필요해요": "필요하다고",
+        "높습니다": "높다고",
+        "높아요": "높다고",
+        "부족합니다": "부족하다고",
+        "보입니다": "보인다고",
+        "보여요": "보인다고",
+        "의심됩니다": "의심된다고",
+        "추정됩니다": "추정된다고",
+    }
+    for ending, replacement in special_endings.items():
+        if cleaned.endswith(ending):
+            return f"{cleaned[: -len(ending)]}{replacement}"
+
+    if cleaned.endswith("입니다"):
+        return f"{cleaned[:-3]}이라고"
+    if cleaned.endswith("됩니다"):
+        return f"{cleaned[:-3]}된다고"
+    if cleaned.endswith("한다"):
+        return f"{cleaned[:-2]}한다고"
+    if cleaned.endswith("하다"):
+        return f"{cleaned[:-2]}한다고"
+    if cleaned.endswith("다"):
+        return f"{cleaned[:-1]}다고"
+    return f"{cleaned}라고"
+
+
+def _contains_ignoring_spaces(text: str, needle: str) -> bool:
+    normalized_text = _normalize_text(text).replace(" ", "")
+    normalized_needle = _normalize_text(needle).replace(" ", "")
+    return bool(normalized_text and normalized_needle and normalized_needle in normalized_text)
+
+
+def _extract_issue_tag(text: str) -> str:
+    normalized = _normalize_text(text)
+    if any(keyword in normalized for keyword in ("소음", "소리", "진동", "흔들")):
+        return "소음"
+    if any(keyword in normalized for keyword in ("배수", "탈수")):
+        return "배수 이상"
+    if any(keyword in normalized for keyword in ("누수", "물이 새", "물 샘", "물샘", "물이 고", "물이 나")):
+        return "누수"
+    if any(keyword in normalized for keyword in ("냄새", "악취")):
+        return "냄새"
+    if any(keyword in normalized for keyword in ("에러", "오류", "코드")):
+        return "오류"
+    if any(keyword in normalized for keyword in ("전원", "안 켜", "안켜", "꺼져", "꺼짐", "먹통")):
+        return "전원 이상"
+    if any(keyword in normalized for keyword in ("냉방", "찬바람", "시원하지", "냉기")):
+        return "냉방 이상"
+    if any(keyword in normalized for keyword in ("가열", "건조", "온도")):
+        return "온도 이상"
+    return ""
+
+
+_INTERNAL_SUMMARY_HEADING_PATTERN = re.compile(
+    r"^(?:\d+\s*단계\s*[:：-]\s*)?"
+    r"(?:증상\s*분류|원인\s*분석|심각도\s*판단(?:\s*(?:\+|및)\s*행동\s*패턴\s*결정)?|"
+    r"판단\s*(?:\+|및)\s*행동\s*패턴\s*결정|행동\s*패턴\s*결정|추천\s*조치|자가점검\s*가이드)"
+    r"\s*[:：-]\s*",
+)
+
+
+def _strip_internal_summary_heading(text: str) -> str:
+    cleaned = _normalize_text(text)
+    if not cleaned:
+        return ""
+
+    previous = None
+    while cleaned and cleaned != previous:
+        previous = cleaned
+        cleaned = _INTERNAL_SUMMARY_HEADING_PATTERN.sub("", cleaned).strip()
+    return cleaned
+
+
+def _resolve_openai_model(model_name: str, fallback: str = "gpt-4.1-mini") -> str:
+    normalized = str(model_name or "").strip()
+    if not normalized:
+        return fallback
+    return _OPENAI_MODEL_ALIASES.get(normalized, normalized)
+
+
+def _extract_openai_response_text(response: Any) -> str:
+    direct_text = getattr(response, "output_text", "")
+    if isinstance(direct_text, str) and direct_text.strip():
+        return direct_text.strip()
+
+    parts: List[str] = []
+    for item in getattr(response, "output", []) or []:
+        for content in getattr(item, "content", []) or []:
+            text_value = getattr(content, "text", None)
+            refusal_value = getattr(content, "refusal", None)
+            if isinstance(text_value, str) and text_value.strip():
+                parts.append(text_value.strip())
+            elif isinstance(refusal_value, str) and refusal_value.strip():
+                parts.append(refusal_value.strip())
+    return "\n".join(parts).strip()
+
+
+def _try_parse_json_object(text: str) -> Dict[str, Any]:
+    raw = str(text or "").strip()
+    if not raw:
+        return {}
+    candidates = [raw]
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, flags=re.DOTALL)
+    if fenced_match:
+        candidates.insert(0, fenced_match.group(1))
+    brace_match = re.search(r"(\{.*\})", raw, flags=re.DOTALL)
+    if brace_match:
+        candidates.append(brace_match.group(1))
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def _build_issue_subject(issue: str, device: str) -> str:
+    cleaned_issue = _trim_phrase(issue)
+    issue_tag = _extract_issue_tag(cleaned_issue)
+    if device and issue_tag:
+        return f"{device} {issue_tag}"
+    if cleaned_issue:
+        if device and device not in cleaned_issue:
+            return _truncate(f"{device} {cleaned_issue}", 28)
+        return _truncate(cleaned_issue, 28)
+    return device
+
+
+def _looks_like_service_only_request(text: str) -> bool:
+    normalized = _normalize_text(text)
+    service_keywords = (
+        "상담사 연결",
+        "상담 연결",
+        "고객센터 연결",
+        "전화 상담",
+        "상담 서비스",
+        "상담 서비스 예약",
+        "AS 신청",
+        "AS 접수",
+        "A/S 신청",
+        "A/S 접수",
+        "서비스 접수",
+        "방문 예약",
+        "출장 예약",
+        "출장 서비스",
+        "출장 서비스 예약",
+        "기사 방문",
+        "기사 파견",
+    )
+    return any(keyword in normalized for keyword in service_keywords)
+
+
+def _extract_issue_phrase(
+    history: Sequence[Dict[str, str]],
+) -> str:
+    """사용자 메시지 전체에서 핵심 증상 구문을 추출합니다."""
+    # 전체 사용자 메시지 수집
+    user_msgs: List[str] = []
+    for turn in history:
+        u = _strip_attachment_lines(turn.get("user", ""))
+        if u:
+            user_msgs.append(u)
+    combined_user = " ".join(user_msgs)
+
+    product_symptom_patterns = [
+        r"((?:냉장고|세탁기|에어컨|건조기|식기세척기|TV|티비|청소기|전자레인지)[이가]?\s*[^.!?\n]{2,25}(?:소음|소리|안\s*돼|안\s*됩|못|불|이상|고장|에러|오류|멈춤|냄새|물|진동|흔들))",
+        r"((?:소음|소리|진동|냄새|누수|에러|오류|고장|이상|멈춤)\s*[^.!?\n]{0,15}(?:냉장고|세탁기|에어컨|건조기|식기세척기))",
+        r"([가-힣]{2,6}(?:이|가)\s+(?:안\s*(?:돼|됩|켜|열|작동)|고장|이상|멈춤|소음|냄새|누수)[^.!?]{0,20})",
+        r"([가-힣]+에서\s+[^.!?]{4,30}(?:소음|소리|냄새|물|이상|오류)[^.!?]{0,10})",
+    ]
+    for pat in product_symptom_patterns:
+        m = re.search(pat, combined_user)
+        if m:
+            return _truncate(m.group(1), 40)
+
+    # 첫 사용자 메시지의 첫 의미 있는 문장
+    if user_msgs:
+        for part in re.split(r"[.!?\n]", user_msgs[0]):
+            cleaned = _normalize_text(part)
+            if len(cleaned) >= 6:
+                return _truncate(cleaned, 40)
+
+    return ""
+
+
+def _extract_diagnosis_from_history(history: Sequence[Dict[str, str]]) -> str:
+    """어시스턴트 응답에서 핵심 진단 결론 문장을 추출합니다."""
+    diagnosis_patterns = [
+        r"([^.!?\n]{4,50}(?:원인으로\s*보입|문제로\s*보입|가능성이\s*높|것으로\s*판단|로\s*인한)[^.!?]{0,30}[.!?]?)",
+        r"(원인[은는이가]?\s*[^.!?\n]{5,50}[.!?])",
+        r"([^.!?\n]{4,50}(?:가능성이\s*있|의심됩|추정됩|추정돼|보여요|보입니다)[^.!?]{0,20}[.!?]?)",
+        r"([^.!?\n]{4,50}(?:확인\s*필요|점검이\s*필요|교체가\s*필요|청소가\s*필요)[^.!?]{0,20}[.!?]?)",
+        r"([^.!?\n]{4,50}(?:고장|이상|불량|막힘|부족|과부하)[^.!?\n]{0,30}[.!?])",
+    ]
+    for turn in reversed(history):
+        a = _clean_assistant_text(turn.get("assistant", ""))
+        if not a:
+            continue
+        for pat in diagnosis_patterns:
+            m = re.search(pat, a)
+            if m:
+                result = _strip_internal_summary_heading(
+                    _normalize_text(m.group(1).rstrip(".!?"))
+                )
+                if len(result) >= 8:
+                    return _truncate(result, 60)
+    return ""
+
+
+def _extract_action_phrase_from_history(history: Sequence[Dict[str, str]]) -> str:
+    """어시스턴트가 권장한 조치/해결책을 추출합니다."""
+    action_keywords = [
+        (r"배수\s*필터\s*청소", "배수 필터 청소"),
+        (r"필터\s*청소", "필터 청소"),
+        (r"전원\s*(?:재시작|리셋|껐다)", "전원 재시작"),
+        (r"온도\s*설정\s*확인", "온도 설정 확인"),
+        (r"컴프레서\s*점검", "컴프레서 점검"),
+        (r"냉매\s*(?:점검|충전|보충)", "냉매 점검"),
+        (r"세탁조\s*청소", "세탁조 청소"),
+        (r"전문\s*기사\s*(?:점검|방문)|기사\s*방문", "전문 기사 점검"),
+        (r"자가\s*점검|자가점검", "자가 점검"),
+        (r"AS\s*(?:신청|접수)|서비스\s*접수", "AS 신청"),
+        (r"재부팅|리셋", "재부팅"),
+    ]
+    for turn in reversed(history):
+        a = turn.get("assistant", "")
+        for pattern, label in action_keywords:
+            if re.search(pattern, a):
+                return label
+    # 번호 목록 첫 항목 fallback
+    for turn in reversed(history):
+        a = _clean_assistant_text(turn.get("assistant", ""))
+        m = re.search(r"(?:^|\s)1[.)]\s*(.{5,30})", a)
+        if m:
+            return _truncate(m.group(1), 25)
+    return ""
+
+
+def _detect_resolved(history_text: str) -> bool:
+    """대화에서 문제 해결 여부를 감지합니다."""
+    return _has_resolved_keyword(history_text)
+
+
+def _has_resolved_keyword(text: str) -> bool:
+    normalized = _normalize_text(text)
+    resolved_keywords = [
+        "해결", "괜찮아졌", "정상 작동", "잘 됩니다", "잘 돼요",
+        "고쳐졌", "작동합니다", "작동돼요", "작동되고 있", "됩니다 감사",
+    ]
+    return any(kw in normalized for kw in resolved_keywords)
+
+
+def _detect_service_request(
+    history_text: str,
+    routing_intent: str,
+    routing_required: bool,
+) -> bool:
+    """AS 접수·출장 요청 여부를 감지합니다."""
+    if routing_required and routing_intent in ("as_request", "book_visit", "connect_agent"):
+        return True
+    service_keywords = [
+        "AS 신청", "as 접수", "서비스 접수", "출장 신청", "방문 예약",
+        "기사 파견", "수리 요청", "서비스 예약", "상담 서비스 예약",
+        "출장 서비스 예약",
+    ]
+    return any(kw in history_text.lower() for kw in service_keywords)
+
+
+def _detect_service_status(
+    history_text: str,
+    routing_intent: str,
+    routing_required: bool,
+) -> str:
+    normalized = _normalize_text(history_text)
+    lowered = normalized.lower()
+
+    if routing_required and routing_intent == "connect_agent":
+        return "상담사 연결 안내"
+    if routing_required and routing_intent == "book_visit":
+        return "방문 예약 안내"
+    if routing_required and routing_intent == "as_request":
+        return "AS 접수 안내"
+
+    if any(
+        keyword in normalized
+        for keyword in (
+            "상담사 연결",
+            "상담 연결",
+            "고객센터 연결",
+            "전화 상담",
+            "상담 서비스",
+            "상담 서비스 예약",
+        )
+    ):
+        return "상담사 연결 안내"
+
+    if any(keyword in normalized for keyword in ("방문 예약 완료", "출장 예약 완료")):
+        return "방문 예약 완료"
+    if any(
+        keyword in normalized
+        for keyword in (
+            "방문 예약",
+            "출장 예약",
+            "기사 방문",
+            "기사 파견",
+            "출장 서비스",
+            "출장 서비스 예약",
+        )
+    ):
+        return "방문 예약 안내"
+
+    if any(keyword in normalized for keyword in ("A/S 신청", "A/S 접수", "서비스 접수", "수리 요청", "서비스 예약")):
+        return "AS 접수 안내"
+    if "as 신청" in lowered or "as 접수" in lowered:
+        return "AS 접수 안내"
+
+    return ""
+
+
+@dataclass
+class _ArchiveSignals:
+    issue: str
+    diagnosis: str
+    action: str
+    resolved: bool
+    service_status: str
+    device: str
+    error_code: str
+
+
+def _collect_archive_signals(
+    history: Sequence[Dict[str, str]],
+    latest_user: str,
+    latest_assistant: str,
+    attachment_name: str,
+    *,
+    routing_intent: str,
+    routing_required: bool,
+) -> _ArchiveSignals:
+    history_text = _all_history_text(history)
+    combined = _normalize_text(f"{history_text} {latest_user} {latest_assistant} {attachment_name}")
+    issue = _extract_issue_phrase(history)
+    diagnosis = _extract_diagnosis_from_history(history)
+    action = _extract_action_phrase_from_history(history)
+    service_status = _detect_service_status(history_text, routing_intent, routing_required)
+    if issue and service_status and not _infer_device_label(issue) and not _extract_issue_tag(issue):
+        if _looks_like_service_only_request(issue):
+            issue = ""
+    if diagnosis and (
+        _has_resolved_keyword(diagnosis)
+        or _looks_like_service_only_request(diagnosis)
+    ):
+        diagnosis = ""
+    if diagnosis and action and _contains_ignoring_spaces(diagnosis, action):
+        diagnosis = ""
+    return _ArchiveSignals(
+        issue=issue,
+        diagnosis=diagnosis,
+        action=action,
+        resolved=_detect_resolved(history_text),
+        service_status=service_status,
+        device=_infer_device_label(combined),
+        error_code=_extract_error_code(combined),
+    )
+
+
+def _serialize_recent_history_for_summary(history: Sequence[Dict[str, str]], max_turns: int = 6) -> str:
+    selected_turns = list(history[-max_turns:])
+    lines: List[str] = []
+    for index, turn in enumerate(selected_turns, start=1):
+        user_text = _strip_attachment_lines(turn.get("user", ""))
+        assistant_text = _clean_assistant_text(turn.get("assistant", ""))
+        if user_text:
+            lines.append(f"[사용자 {index}] {user_text}")
+        if assistant_text:
+            lines.append(f"[상담 {index}] {assistant_text}")
+    return "\n".join(lines).strip()
+
+
+def _normalize_archive_summary_output(summary: str) -> str:
+    cleaned = _normalize_text(
+        str(summary or "")
+        .replace("```json", " ")
+        .replace("```", " ")
+        .strip()
+        .strip('"')
+        .strip("'")
+    )
+    if not cleaned:
+        return ""
+    return _truncate(cleaned, 140)
+
+
+def _split_archive_summary_lines(summary: str) -> tuple[str, str]:
+    normalized = _normalize_archive_summary_output(summary)
+    if not normalized:
+        return "", ""
+
+    cause_line = ""
+    action_line = ""
+    for line in normalized.splitlines():
+        if not cause_line and re.match(r"^(원인|증상):", line):
+            cause_line = line
+        elif not action_line and line.startswith("조치:"):
+            action_line = line
+    return cause_line, action_line
+
+
+def _build_archive_summary_prompt(
+    history: Sequence[Dict[str, str]],
+    latest_user: str,
+    latest_assistant: str,
+    signals: _ArchiveSignals,
+    *,
+    routing_intent: str,
+    routing_required: bool,
+    ai_meta: Optional[Dict[str, Any]],
+) -> str:
+    judgment_steps = {}
+    if isinstance(ai_meta, dict):
+        raw_steps = ai_meta.get("judgment_steps")
+        if isinstance(raw_steps, dict):
+            judgment_steps = raw_steps
+
+    preferred_cause = signals.diagnosis or _normalize_text(judgment_steps.get("step2", ""))
+    preferred_action = signals.action or signals.service_status
+
+    signal_lines = [
+        f"- 제품: {signals.device or '미상'}",
+        f"- 핵심 증상: {signals.issue or '미상'}",
+        f"- 추정 원인: {preferred_cause or '미상'}",
+        f"- 권장 조치: {signals.action or '미상'}",
+        f"- 서비스 상태: {signals.service_status or '없음'}",
+        f"- 해결 여부: {'해결됨' if signals.resolved else '미해결 또는 불명'}",
+        f"- 라우팅 intent: {routing_intent or 'normal_chat'}",
+        f"- 라우팅 필요 여부: {'예' if routing_required else '아니오'}",
+    ]
+
     if latest_user:
-        if device and device not in latest_user:
-            return _truncate(f"{device} {latest_user}", 36)
+        signal_lines.append(f"- 최신 사용자 메시지: {latest_user}")
+    if latest_assistant:
+        signal_lines.append(f"- 최신 상담 응답: {latest_assistant}")
+    if isinstance(ai_meta, dict):
+        severity_level = ai_meta.get("severity_level")
+        action_pattern = ai_meta.get("action_pattern")
+        if severity_level not in (None, ""):
+            signal_lines.append(f"- severity_level: {severity_level}")
+        if action_pattern:
+            signal_lines.append(f"- action_pattern: {action_pattern}")
+        for key in ("step1", "step2", "step3"):
+            value = _normalize_text(judgment_steps.get(key, ""))
+            if value:
+                signal_lines.append(f"- {key}: {value}")
+
+    recent_history = _serialize_recent_history_for_summary(history)
+    return (
+        "보관함 카드에 표시할 한국어 요약을 만드세요.\n"
+        "목표는 자연스럽고 간결하지만 정확한 한 줄 요약입니다.\n"
+        "문체는 아래 예시처럼 설명형 문장으로 써 주세요.\n"
+        "예시 문체:\n"
+        "- 냉장고 소음으로 문의주셨어요. 원인은 팬 간섭으로 보고 자가 점검을 안내드렸어요.\n"
+        "- AS 관련 문의를 주셨어요. AS 접수를 안내드렸어요.\n"
+        "- 세탁기 진동으로 문의주셨어요. 자가 점검을 안내드렸고 이후 해결됐어요.\n"
+        "- 방문 예약 관련 문의를 주셨어요. 방문 예약을 안내드렸어요.\n"
+        "- 기사 방문이 필요하다고 보고 방문 예약해드렸어요.\n"
+        "가능하면 첫 문장은 `...으로 문의주셨어요.` 또는 `... 관련 문의를 주셨어요.` 형태로 시작하세요.\n"
+        "원인이 있으면 `원인은 ...이라고 보고` 형태를 우선 사용하세요.\n"
+        "문장 끝은 가능하면 `안내드렸어요`, `도와드렸어요`, `예약해드렸어요`처럼 부드럽게 마무리하세요.\n"
+        "조치에는 실제 대화에 나온 자가조치, AS 접수, 방문 예약, 상담사 연결, 해결 여부만 적으세요.\n"
+        "증거가 불충분하면 단정하지 말고 `가능성이 높다고`, `추정된다고`, `확인 필요하다고` 같은 표현을 유지하세요.\n"
+        "라벨형 표현(`원인:`, `조치:`), 마크다운, 따옴표, 불필요한 부연은 쓰지 마세요.\n"
+        f"추정 원인: {preferred_cause or '미상'}\n"
+        f"핵심 조치: {preferred_action or '미상'}\n"
+        "반드시 JSON만 출력하세요. 형식: {\"summary\":\"한 줄 요약\"}\n\n"
+        "예시 1:\n"
+        "{\"summary\":\"냉장고 누수로 문의주셨어요. 원인은 배수구 막힘이라고 보고 배수 필터 청소 후 AS 접수를 안내드렸어요.\"}\n"
+        "예시 2:\n"
+        "{\"summary\":\"상담사 연결 관련 문의를 주셨어요. 상담사 연결을 안내드렸어요.\"}\n"
+        "예시 3:\n"
+        "{\"summary\":\"기사 방문이 필요하다고 보고 방문 예약해드렸어요.\"}\n\n"
+        "구조화 단서:\n"
+        f"{chr(10).join(signal_lines)}\n\n"
+        "최근 대화:\n"
+        f"{recent_history or '없음'}"
+    )
+
+
+def _generate_archive_summary_via_ai(
+    history: Sequence[Dict[str, str]],
+    latest_user: str,
+    latest_assistant: str,
+    signals: _ArchiveSignals,
+    *,
+    routing_intent: str,
+    routing_required: bool,
+    ai_meta: Optional[Dict[str, Any]],
+) -> str:
+    if OpenAI is None or not os.getenv("OPENAI_API_KEY"):
+        return ""
+
+    prompt = _build_archive_summary_prompt(
+        history,
+        latest_user,
+        latest_assistant,
+        signals,
+        routing_intent=routing_intent,
+        routing_required=routing_required,
+        ai_meta=ai_meta,
+    )
+
+    try:
+        response = OpenAI().responses.create(
+            model=_resolve_openai_model(ARCHIVE_SUMMARY_MODEL),
+            input=prompt,
+            max_output_tokens=180,
+        )
+    except Exception:
+        return ""
+
+    raw_output = _extract_openai_response_text(response)
+    parsed = _try_parse_json_object(raw_output)
+    summary = parsed.get("summary", "") if isinstance(parsed, dict) else ""
+    if isinstance(summary, str) and summary.strip():
+        return _normalize_archive_summary_output(summary)
+    return _normalize_archive_summary_output(raw_output)
+
+
+def _dedupe_phrases(phrases: Sequence[str]) -> List[str]:
+    items: List[str] = []
+    seen = set()
+    for phrase in phrases:
+        cleaned = _normalize_text(phrase)
+        if not cleaned:
+            continue
+        key = cleaned.replace(" ", "")
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(cleaned)
+    return items
+
+
+def _build_archive_cause_line(
+    signals: _ArchiveSignals,
+    issue_subject: str,
+    latest_user: str,
+) -> str:
+    diagnosis_text = _trim_phrase(signals.diagnosis)
+    if diagnosis_text and (
+        _has_resolved_keyword(diagnosis_text)
+        or _looks_like_service_only_request(diagnosis_text)
+    ):
+        diagnosis_text = ""
+    if diagnosis_text:
+        return _ensure_sentence(f"원인: {diagnosis_text}")
+    if signals.resolved and _has_resolved_keyword(latest_user):
+        return ""
+    if latest_user and _looks_like_service_only_request(latest_user):
+        return ""
+    if issue_subject:
+        return _ensure_sentence(f"증상: {issue_subject}")
+    if latest_user:
+        return _ensure_sentence(f"증상: {_truncate(_trim_phrase(latest_user), 42)}")
+    return ""
+
+
+def _build_archive_action_line(signals: _ArchiveSignals) -> str:
+    action_text = _trim_phrase(signals.action)
+
+    if signals.resolved:
+        if action_text and action_text != "AS 신청":
+            return _ensure_sentence(f"조치: {action_text} 안내 후 해결")
+        return "조치: 안내 후 해결."
+
+    action_parts: List[str] = []
+    if action_text and action_text != "AS 신청":
+        action_parts.append(f"{action_text} 안내")
+
+    service_action = {
+        "AS 접수 안내": "AS 접수 안내",
+        "방문 예약 안내": "방문 예약 안내",
+        "방문 예약 완료": "방문 예약 완료",
+        "상담사 연결 안내": "상담사 연결 안내",
+    }.get(signals.service_status, "")
+    if service_action:
+        action_parts.append(service_action)
+
+    deduped = _dedupe_phrases(action_parts)
+    if deduped:
+        return _ensure_sentence(f"조치: {', '.join(deduped)}")
+
+    if signals.diagnosis:
+        return "조치: 추가 점검 필요."
+    return ""
+
+
+def _build_archive_lead_sentence(
+    signals: _ArchiveSignals,
+    issue_subject: str,
+    latest_user: str,
+) -> str:
+    if issue_subject and not _looks_like_service_only_request(issue_subject):
+        return f"{issue_subject}으로 문의주셨어요."
+
+    if signals.service_status == "AS 접수 안내":
+        return "AS 관련 문의를 주셨어요."
+    if signals.service_status == "방문 예약 안내":
+        return "방문 예약 관련 문의를 주셨어요."
+    if signals.service_status == "방문 예약 완료":
+        return "방문 예약 관련 문의를 주셨어요."
+    if signals.service_status == "상담사 연결 안내":
+        return "상담사 연결 관련 문의를 주셨어요."
+
+    if latest_user:
+        return f"{_truncate(_trim_phrase(latest_user), 36)} 관련 문의를 주셨어요."
+    return ""
+
+
+def _build_archive_reason_intro(diagnosis_text: str) -> str:
+    cleaned = _trim_phrase(_strip_internal_summary_heading(diagnosis_text))
+    if not cleaned:
+        return ""
+
+    cleaned = re.sub(r"^원인[은는이가]?\s*", "", cleaned)
+    explicit_reason_patterns = (
+        r"^(.+?)[이가]\s*원인으로\s*보입니다$",
+        r"^(.+?)[이가]\s*원인으로\s*보여요$",
+        r"^(.+?)[이가]\s*원인으로\s*추정됩니다$",
+        r"^(.+?)[이가]\s*원인으로\s*의심됩니다$",
+    )
+    for pattern in explicit_reason_patterns:
+        match = re.match(pattern, cleaned)
+        if match:
+            cleaned = _trim_phrase(match.group(1))
+            break
+
+    if cleaned.endswith("필요"):
+        return f"원인은 {cleaned}하다고 보고"
+    return f"원인은 {_to_reported_clause(cleaned)} 보고"
+
+
+def _build_archive_result_sentence(signals: _ArchiveSignals) -> str:
+    action_text = _trim_phrase(signals.action)
+    reason_intro = _build_archive_reason_intro(signals.diagnosis)
+
+    if signals.resolved:
+        if action_text and not ("AS 접수" in signals.service_status and "AS" in action_text):
+            return f"{action_text}을 안내드렸고 이후 해결됐어요."
+        return "안내드린 뒤 증상이 해결됐어요."
+
+    if signals.service_status == "AS 접수 안내":
+        if reason_intro:
+            return f"{reason_intro} AS 접수를 안내드렸어요."
+        return "AS 접수를 안내드렸어요."
+    if signals.service_status == "방문 예약 안내":
+        if reason_intro:
+            return f"{reason_intro} 방문 예약해드렸어요."
+        if action_text and action_text != "AS 신청":
+            return f"{action_text}이 필요하다고 보고 방문 예약해드렸어요."
+        return "방문 예약을 안내드렸어요."
+    if signals.service_status == "방문 예약 완료":
+        if reason_intro:
+            return f"{reason_intro} 방문 예약해드렸어요."
+        return "방문 예약해드렸어요."
+    if signals.service_status == "상담사 연결 안내":
+        return "상담사 연결을 안내드렸어요."
+
+    if reason_intro and action_text:
+        return f"{reason_intro} {action_text}을 안내드렸어요."
+    if reason_intro:
+        return f"{reason_intro} 확인해보시도록 안내드렸어요."
+    if action_text:
+        return f"{action_text}을 안내드렸어요."
+    return ""
+
+
+def _build_archive_narrative_summary(
+    signals: _ArchiveSignals,
+    issue_subject: str,
+    latest_user: str,
+    latest_assistant: str,
+) -> str:
+    lead_sentence = _build_archive_lead_sentence(signals, issue_subject, latest_user)
+    result_sentence = _build_archive_result_sentence(signals)
+
+    compact_summary = " ".join(part for part in (lead_sentence, result_sentence) if part)
+    if compact_summary:
+        return _truncate(compact_summary, 140)
+
+    symptom = _extract_first_sentence(latest_assistant)
+    if symptom:
+        return _truncate(f"{_trim_phrase(symptom)} 관련 안내를 드렸어요.", 140)
+    if latest_user:
+        return _truncate(f"{_trim_phrase(latest_user)} 관련 안내를 드렸어요.", 140)
+    return ""
+
+
+def _build_archive_title(
+    history: Sequence[Dict[str, str]],
+    latest_user: str,
+    latest_assistant: str,
+    attachment_name: str,
+    *,
+    routing_intent: str,
+    routing_required: bool,
+) -> str:
+    signals = _collect_archive_signals(
+        history,
+        latest_user,
+        latest_assistant,
+        attachment_name,
+        routing_intent=routing_intent,
+        routing_required=routing_required,
+    )
+    issue_subject = _build_issue_subject(signals.issue, signals.device)
+
+    if signals.device and signals.error_code:
+        return f"{signals.device} {signals.error_code} 오류 상담"
+    if signals.error_code:
+        return f"{signals.error_code} 오류 상담"
+    if issue_subject:
+        if "방문 예약" in signals.service_status:
+            return _truncate(f"{issue_subject} 방문 예약", 36)
+        if "상담사 연결" in signals.service_status:
+            return _truncate(f"{issue_subject} 상담 연결", 36)
+        if "AS 접수" in signals.service_status:
+            return _truncate(f"{issue_subject} AS 요청", 36)
+        if signals.resolved:
+            return _truncate(f"{issue_subject} 해결", 36)
+        if signals.diagnosis:
+            return _truncate(f"{issue_subject} 진단", 36)
+        return _truncate(f"{issue_subject} 상담", 36)
+    if "방문 예약" in signals.service_status:
+        return "출장서비스 예약 요청"
+    if "상담사 연결" in signals.service_status:
+        return "상담사 연결 요청"
+    if "AS 접수" in signals.service_status:
+        return "AS 접수 요청"
+    if latest_user:
+        if signals.device and signals.device not in latest_user:
+            return _truncate(f"{signals.device} {latest_user}", 36)
         return _truncate(latest_user, 36)
-    if device and attachment_name:
-        return f"{device} 이미지 진단"
+    if signals.device and attachment_name:
+        return f"{signals.device} 이미지 진단"
     if attachment_name:
         return _truncate(f"{attachment_name} 진단", 36)
     if latest_assistant:
@@ -198,19 +1006,53 @@ def _build_archive_title(latest_user: str, latest_assistant: str, attachment_nam
     return "새 채팅"
 
 
-def _build_archive_summary(latest_user: str, latest_assistant: str) -> str:
-    symptom = _extract_first_sentence(latest_assistant)
-    solution = _extract_solution_line(latest_assistant)
+def _build_archive_summary(
+    history: Sequence[Dict[str, str]],
+    latest_user: str,
+    latest_assistant: str,
+    *,
+    routing_intent: str,
+    routing_required: bool,
+    ai_meta: Optional[Dict[str, Any]],
+) -> str:
+    """보관함 카드에 노출할 자연스러운 문장형 요약을 생성합니다."""
+    signals = _collect_archive_signals(
+        history,
+        latest_user,
+        latest_assistant,
+        "",
+        routing_intent=routing_intent,
+        routing_required=routing_required,
+    )
 
-    if symptom and solution:
-        return _truncate(f"{symptom} {solution} 안내함.", 120)
-    if solution:
-        return _truncate(f"{solution} 안내함.", 120)
+    issue_subject = _build_issue_subject(signals.issue, signals.device)
+    narrative_summary = _build_archive_narrative_summary(
+        signals,
+        issue_subject,
+        latest_user,
+        latest_assistant,
+    )
+    if narrative_summary:
+        return narrative_summary
+
+    ai_summary = _generate_archive_summary_via_ai(
+        history,
+        latest_user,
+        latest_assistant,
+        signals,
+        routing_intent=routing_intent,
+        routing_required=routing_required,
+        ai_meta=ai_meta,
+    )
+    if ai_summary:
+        return ai_summary
+
+    symptom = _extract_first_sentence(latest_assistant)
     if symptom:
-        return _truncate(symptom, 120)
+        return _truncate(f"{_trim_phrase(symptom)} 관련 안내를 드렸어요.", 140)
     if latest_user:
-        return _truncate(latest_user, 120)
-    return "대화가 시작되었습니다."
+        return _truncate(f"{_trim_phrase(latest_user)} 관련 안내를 드렸어요.", 140)
+    return "안내를 도와드렸어요."
 
 
 def build_title_and_summary(
@@ -218,27 +1060,30 @@ def build_title_and_summary(
     *,
     routing_intent: str = "normal_chat",
     routing_required: bool = False,
+    ai_meta: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, str]:
     """Build a short archive title and one-line summary from the conversation."""
     latest_user = _extract_latest_user_text(history)
     latest_assistant = _extract_latest_assistant_text(history)
     attachment_name = _extract_latest_user_attachment_name(history)
 
-    if routing_required and routing_intent == "connect_agent":
-        return (
-            "상담사 연결 요청",
-            "상담사 연결이 필요하다고 판단해 상담 연결 선택 단계로 안내함.",
-        )
-
-    if routing_required and routing_intent == "book_visit":
-        return (
-            "출장서비스 예약 요청",
-            "출장서비스 예약이 필요하다고 판단해 방문 예약 선택 단계로 안내함.",
-        )
-
     return (
-        _build_archive_title(latest_user, latest_assistant, attachment_name),
-        _build_archive_summary(latest_user, latest_assistant),
+        _build_archive_title(
+            history,
+            latest_user,
+            latest_assistant,
+            attachment_name,
+            routing_intent=routing_intent,
+            routing_required=routing_required,
+        ),
+        _build_archive_summary(
+            history,
+            latest_user,
+            latest_assistant,
+            routing_intent=routing_intent,
+            routing_required=routing_required,
+            ai_meta=ai_meta,
+        ),
     )
 
 
@@ -353,6 +1198,7 @@ def save_chat_exchange(
         history,
         routing_intent=routing_intent,
         routing_required=routing_required,
+        ai_meta=ai_meta,
     )
     session.title = title
     session.summary = summary

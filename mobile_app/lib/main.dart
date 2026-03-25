@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -20,6 +21,9 @@ import 'screens/care_screen.dart';
 import 'screens/chatthinq_background.dart';
 import 'screens/chatthinq_welcome_screen.dart';
 import 'screens/menu_screen.dart';
+import 'screens/service_booking_flow_screen.dart';
+import 'screens/service_consult_booking_screen.dart';
+import 'screens/visit_service_booking_screen.dart';
 
 const _defaultBaseUrlOverride = String.fromEnvironment('DEFAULT_BASE_URL');
 
@@ -207,6 +211,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
     'aac',
     'flac',
   };
+  static const Set<String> _supportedImageExtensions = {
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'heic',
+    'heif',
+    'bmp',
+    'gif',
+  };
   // 서버 INTENT_KEYWORD_HINTS와 동기화된 목록 (mobile_api.py 참조)
   static const List<String> _serviceActionKeywords = [
     // AS 신청
@@ -228,6 +242,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   final _imagePicker = ImagePicker();
   final _voiceRecorder = AudioRecorder();
   final _tts = FlutterTts();
+  final _audioPlayer = AudioPlayer();
 
   List<ChatTurn> _history = const [];
   File? _selectedImage;
@@ -249,6 +264,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
   bool _autoSpeak = true;
   bool _showWelcomeScreen = true;
   bool _showChatThinQOnboarding = true;
+  bool _showChatReboOnboarding = false;
+  int _chatReboOnboardingStep = 0;
   bool _showArchiveScreen = false;
   bool _archiveOpenedFromChat = false;
   bool _isLoadingArchive = false;
@@ -263,6 +280,34 @@ class _MobileHomePageState extends State<MobileHomePage> {
     (4, '수현'),
     (5, '혜민'),
   ];
+  static const _demoUserPrefills =
+      <int, ({String name, String phone, String address})>{
+        1: (
+          name: '경옥',
+          phone: '010-3821-5647',
+          address: '서울특별시 강동구 천호대로 423 래미안강동팰리스 102동 804호',
+        ),
+        2: (
+          name: '경은',
+          phone: '010-9204-7731',
+          address: '경기도 성남시 분당구 불정로 90 네이버그린팩토리 인근 판교역로 235 힐스테이트판교역 501호',
+        ),
+        3: (
+          name: '지영',
+          phone: '010-6642-3098',
+          address: '인천광역시 부평구 부평대로 168 부평삼성래미안 7동 1203호',
+        ),
+        4: (
+          name: '수현',
+          phone: '010-5519-8823',
+          address: '서울특별시 마포구 와우산로 94 홍익대학교 인근 서교자이 203호',
+        ),
+        5: (
+          name: '혜민',
+          phone: '010-7734-2201',
+          address: '서울특별시 송파구 올림픽로 300 롯데월드타워 인근 파크리오 15동 602호',
+        ),
+      };
   String _serverStatus = '확인 중';
   String? _archiveErrorMessage;
   List<ArchiveSessionSummary> _archiveSessions = const [];
@@ -296,7 +341,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ? _defaultBaseUrlOverride
         : (Platform.isAndroid
               ? 'http://192.168.0.13:8000'
-
               : 'http://127.0.0.1:8000');
     unawaited(_configureTts());
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkConnection());
@@ -314,6 +358,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _streamingTimer?.cancel();
     _composerDebounceTimer?.cancel();
     unawaited(_voiceRecorder.dispose());
+    unawaited(_audioPlayer.dispose());
     unawaited(_tts.stop());
     super.dispose();
   }
@@ -423,6 +468,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           hintText: '소리 특징을 텍스트로 입력해주세요',
           gradientColors: [Color(0xFFFFF4F1), Color(0xFFFFD9D2)],
           accent: Color(0xFFE95A4D),
+          fontFamily: 'Pretendard',
         );
       case AssistantMode.photo:
         return const _ModePresentation(
@@ -432,6 +478,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           hintText: '사진과 함께 상태를 입력해주세요',
           gradientColors: [Color(0xFFFFF5F2), Color(0xFFFFDDE2)],
           accent: Color(0xFFEF6B64),
+          fontFamily: 'Pretendard',
         );
       case AssistantMode.replying:
         return const _ModePresentation(
@@ -441,6 +488,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           hintText: '응답 생성 중 ···',
           gradientColors: [Color(0xFFFFF4F2), Color(0xFFFFD7DB)],
           accent: Color(0xFFD34B5C),
+          fontFamily: 'Pretendard',
         );
       case AssistantMode.idle:
       case AssistantMode.maincharacter:
@@ -452,6 +500,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           hintText: '메시지를 입력하세요',
           gradientColors: const [Color(0xFFFFF7F3), Color(0xFFFFDCD6)],
           accent: const Color(0xFFE9524A),
+          fontFamily: 'Pretendard',
         );
     }
   }
@@ -499,6 +548,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   Future<void> _stopSpeaking() async {
     try {
+      await _audioPlayer.stop();
+    } catch (_) {}
+    try {
       await _tts.stop();
     } catch (_) {}
   }
@@ -542,8 +594,24 @@ class _MobileHomePageState extends State<MobileHomePage> {
       return;
     }
 
+    await _stopSpeaking();
+
     try {
-      await _stopSpeaking();
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/tts'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'text': trimmed}),
+      );
+      if (response.statusCode == 200) {
+        await _audioPlayer.play(BytesSource(response.bodyBytes));
+        return;
+      }
+      debugPrint('[TTS] 백엔드 오류 ${response.statusCode}: ${response.body}');
+    } catch (error) {
+      debugPrint('[TTS] 요청 실패: $error');
+    }
+
+    try {
       await _tts.speak(trimmed);
     } catch (error) {
       if (!mounted) {
@@ -624,10 +692,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Future<void> _pickImageFromGallery() =>
       _pickImageFromSource(ImageSource.gallery);
 
-  Future<void> _pickAudio() async {
+  Future<void> _pickAttachmentFile() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
-      type: FileType.audio,
+      type: FileType.custom,
+      allowedExtensions: [
+        ..._supportedImageExtensions,
+        ..._supportedAudioExtensions,
+      ],
+      withData: true,
     );
 
     if (!mounted || result == null || result.files.isEmpty) {
@@ -635,25 +708,45 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
 
     final picked = result.files.single;
-    if (picked.path == null) {
+    File? selectedFile;
+    if (picked.path != null) {
+      selectedFile = File(picked.path!);
+    } else if (picked.bytes != null) {
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/${picked.name}');
+      await tempFile.writeAsBytes(picked.bytes!);
+      selectedFile = tempFile;
+    }
+
+    if (selectedFile == null) {
       setState(() {
-        _errorMessage = '선택한 오디오 파일을 읽을 수 없습니다.';
+        _errorMessage = '선택한 파일을 읽을 수 없습니다.';
       });
       return;
     }
 
     final extension = picked.extension?.toLowerCase() ?? '';
-    if (!_supportedAudioExtensions.contains(extension)) {
+    if (_supportedImageExtensions.contains(extension)) {
       setState(() {
-        _errorMessage = '지원하는 오디오 형식만 사용할 수 있어요: wav, mp3, m4a, aac, flac';
+        _selectedImage = selectedFile;
+        _selectedImageName = picked.name;
+        _errorMessage = null;
+      });
+      return;
+    }
+
+    if (_supportedAudioExtensions.contains(extension)) {
+      setState(() {
+        _selectedAudio = selectedFile;
+        _selectedAudioName = picked.name;
+        _errorMessage = null;
       });
       return;
     }
 
     setState(() {
-      _selectedAudio = File(picked.path!);
-      _selectedAudioName = picked.name;
-      _errorMessage = null;
+      _errorMessage =
+          '지원하는 파일 형식만 사용할 수 있어요: jpg, jpeg, png, webp, heic, wav, mp3, m4a, aac, flac';
     });
   }
 
@@ -1093,7 +1186,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       child: _AttachmentQuickAction(
                         icon: Icons.attach_file_rounded,
                         label: '파일',
-                        onTap: () => handleTap(_pickAudio),
+                        onTap: () => handleTap(_pickAttachmentFile),
                       ),
                     ),
                   ],
@@ -1160,6 +1253,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
 
     return _serviceActionKeywords.any(normalized.contains);
+  }
+
+  bool _isServiceConsultCancelMessage(String text) {
+    final normalized = text.trim().replaceAll(' ', '');
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    return normalized == '상담서비스예약취소' ||
+        normalized == '상담예약취소' ||
+        normalized == '예약취소';
   }
 
   String _buildLocalUserDisplayMessage({
@@ -1247,14 +1351,132 @@ class _MobileHomePageState extends State<MobileHomePage> {
     });
   }
 
+  void _appendLocalAssistantTurn({
+    required String user,
+    required String assistant,
+  }) {
+    setState(() {
+      _serviceRoutingStep = ServiceRoutingStep.none;
+      _history = [..._history, ChatTurn(user: user, assistant: assistant)];
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   void _handleServiceActionSelection(String actionLabel) {
+    switch (actionLabel) {
+      case '자가점검':
+        _startAiDiagnosisFromRouting();
+        return;
+      case '상담 서비스':
+      case '상담사 연결':
+        _appendLocalAssistantTurn(
+          user: '상담 서비스',
+          assistant: '__SERVICE_CONSULT__',
+        );
+        return;
+      case '출장 서비스':
+      case '출장서비스 예약':
+        _appendLocalAssistantTurn(
+          user: '출장 서비스',
+          assistant: '__VISIT_SERVICE__',
+        );
+        return;
+    }
+
     setState(() {
       _serviceRoutingStep = ServiceRoutingStep.none;
     });
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$actionLabel 선택 화면으로 이어질 수 있도록 준비했어요.')),
+  Future<void> _openServiceConsultBookingScreen() async {
+    final seedProfile = _demoUserPrefills[_dbUserId];
+    final result = await Navigator.of(context).push<ServiceBookingDraft>(
+      MaterialPageRoute(
+        builder: (_) => ServiceConsultBookingScreen(
+          baseUrl: _baseUrl,
+          userId: _dbUserId,
+          initialUserName: seedProfile?.name ?? _dbUserName,
+          initialPhoneNumber: seedProfile?.phone ?? '',
+          initialAddress: seedProfile?.address ?? '',
+        ),
+        fullscreenDialog: true,
+      ),
     );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      _history = [
+        ..._history,
+        ChatTurn(
+          user: '상담 서비스 예약 완료',
+          assistant: _encodeServiceConsultCompletionMessage(result),
+        ),
+      ];
+      _serviceRoutingStep = ServiceRoutingStep.none;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _openVisitServiceBookingScreen() async {
+    final seedProfile = _demoUserPrefills[_dbUserId];
+    final result = await Navigator.of(context).push<ServiceBookingDraft>(
+      MaterialPageRoute(
+        builder: (_) => VisitServiceBookingScreen(
+          baseUrl: _baseUrl,
+          userId: _dbUserId,
+          initialUserName: seedProfile?.name ?? _dbUserName,
+          initialPhoneNumber: seedProfile?.phone ?? '',
+          initialAddress: seedProfile?.address ?? '',
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      _history = [
+        ..._history,
+        ChatTurn(
+          user: '출장 서비스 예약 완료',
+          assistant: _encodeVisitServiceCompletionMessage(result),
+        ),
+      ];
+      _serviceRoutingStep = ServiceRoutingStep.none;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   String _stripDisplayedImageAttachmentLine(String message) {
@@ -1320,6 +1542,36 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _recordedNoise == null) {
       setState(() {
         _errorMessage = '텍스트, 사진, 음성 중 하나 이상을 추가해주세요.';
+      });
+      return;
+    }
+
+    if (_selectedImage == null &&
+        _selectedAudio == null &&
+        _recordedVoice == null &&
+        _recordedNoise == null &&
+        _isServiceConsultCancelMessage(message)) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() {
+        _messageController.clear();
+        _errorMessage = null;
+        _serviceRoutingStep = ServiceRoutingStep.none;
+        _history = [
+          ..._history,
+          const ChatTurn(
+            user: '상담 서비스 예약 취소',
+            assistant: _serviceConsultCancelMarker,
+          ),
+        ];
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       });
       return;
     }
@@ -1433,13 +1685,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
           routingRequired && asRoutingIntents.contains(routingIntent);
       final nextRoutingStep = ServiceRoutingStep.none;
 
-      // AS 관련 인텐트 → 마지막 턴 assistant를 __AS_ROUTING__으로 교체
+      // AS 관련 인텐트: 진단 텍스트 + __AS_ROUTING__ 마커를 함께 보존
       final rawAssistantMessage =
           decoded['assistant_message']?.toString().trim() ??
           (mergedHistory.isNotEmpty ? mergedHistory.last.assistant : '');
-      final assistantMessage = isAsRouting
-          ? '__AS_ROUTING__'
-          : rawAssistantMessage;
+      final assistantMessage = rawAssistantMessage;
       final shouldSpeak =
           _autoSpeak && assistantMessage.isNotEmpty && !isAsRouting;
 
@@ -1461,15 +1711,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 .toList()
           : <Map<String, dynamic>>[];
 
-      final finalHistory = isAsRouting && mergedHistory.isNotEmpty
-          ? [
-              ...mergedHistory.sublist(0, mergedHistory.length - 1),
-              mergedHistory.last.copyWith(assistant: '__AS_ROUTING__'),
-            ]
-          : mergedHistory.isNotEmpty
+      final finalHistory = mergedHistory.isNotEmpty
           ? [
               ...mergedHistory.sublist(0, mergedHistory.length - 1),
               mergedHistory.last.copyWith(
+                assistant: isAsRouting ? rawAssistantMessage : null,
                 assistantImages: assistantImages,
                 severityLevel: severityLevel,
                 actionPattern: actionPattern,
@@ -1577,6 +1823,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _showWelcomeScreen = false;
+      _showChatReboOnboarding = false;
+      _chatReboOnboardingStep = 0;
       _showArchiveScreen = false;
       _archiveOpenedFromChat = false;
       _selectedBottomNavIndex = 2;
@@ -1601,6 +1849,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _showWelcomeScreen = false;
+      _showChatReboOnboarding = false;
+      _chatReboOnboardingStep = 0;
       _showArchiveScreen = false;
       _archiveOpenedFromChat = false;
       _selectedBottomNavIndex = 2;
@@ -1624,12 +1874,48 @@ class _MobileHomePageState extends State<MobileHomePage> {
     });
   }
 
-  void _dismissChatThinQOnboarding() {
+  void _advanceToChatReboOnboarding() {
     if (!_showChatThinQOnboarding) {
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _showChatThinQOnboarding = false;
+      _showChatReboOnboarding = true;
+      _chatReboOnboardingStep = 0;
+      _showWelcomeScreen = false;
+      _showArchiveScreen = false;
+      _archiveOpenedFromChat = false;
+      _selectedBottomNavIndex = 2;
+      _history = const [];
+      _chatSessionId = null;
+      _serviceRoutingStep = ServiceRoutingStep.none;
+      _selectedImage = null;
+      _selectedAudio = null;
+      _recordedVoice = null;
+      _recordedNoise = null;
+      _selectedImageName = null;
+      _selectedAudioName = null;
+      _recordedVoiceName = null;
+      _recordedNoiseName = null;
+      _latestEvidence = null;
+      _errorMessage = null;
+      _messageController.clear();
+    });
+  }
+
+  void _dismissChatReboOnboarding() {
+    if (!_showChatReboOnboarding) {
+      return;
+    }
+    setState(() {
+      if (_chatReboOnboardingStep == 0) {
+        _chatReboOnboardingStep = 1;
+      } else {
+        _showChatReboOnboarding = false;
+        _chatReboOnboardingStep = 0;
+        _showWelcomeScreen = true;
+      }
     });
   }
 
@@ -1637,6 +1923,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _showWelcomeScreen = true;
+      _showChatReboOnboarding = false;
+      _chatReboOnboardingStep = 0;
       _showArchiveScreen = false;
     });
   }
@@ -2139,6 +2427,21 @@ class _MobileHomePageState extends State<MobileHomePage> {
     return '$month.$day $hour:$minute';
   }
 
+  String _formatArchiveCardDate(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return '';
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value;
+    }
+    final local = parsed.toLocal();
+    final year = local.year.toString().padLeft(4, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '$year.$month.$day';
+  }
+
   String _archiveStatusLabel(String status) {
     switch (status) {
       case 'resolved':
@@ -2153,6 +2456,159 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Widget _buildArchiveScreen() {
     final hasSessions = _archiveSessions.isNotEmpty;
 
+    return Scaffold(
+      backgroundColor: const Color(0xFFEFF1F4),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        automaticallyImplyLeading: false,
+        titleSpacing: 19,
+        toolbarHeight: 40,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              tooltip: '뒤로 가기',
+              onPressed: _closeArchiveScreen,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 20,
+                color: Color(0xFF212121),
+              ),
+            ),
+            const Text(
+              '채팅 보관함',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF212121),
+                height: 1.11,
+              ),
+            ),
+            const SizedBox(width: 24),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(19, 8, 19, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: const [
+                  Text(
+                    '최신순',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF606C80),
+                      height: 1.14,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: Color(0xFF606C80),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: const Color(0xFFE9524A),
+                onRefresh: _loadArchiveSessions,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(19, 0, 19, 20),
+                  children: [
+                    if (_archiveErrorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7F4),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFFFD6CD)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              '목록을 불러오지 못했어요.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF9D3F30),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _archiveErrorMessage!,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                height: 1.45,
+                                color: Color(0xFF7A4A42),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: _loadArchiveSessions,
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                '다시 시도',
+                                style: TextStyle(
+                                  color: Color(0xFF606C80),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (_isLoadingArchive && !hasSessions) ...[
+                      const SizedBox(height: 64),
+                      const Center(child: CircularProgressIndicator()),
+                      const SizedBox(height: 12),
+                      const Center(
+                        child: Text(
+                          '보관된 대화를 불러오는 중이에요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Color(0xFF606C80),
+                          ),
+                        ),
+                      ),
+                    ] else if (!hasSessions) ...[
+                      _buildArchiveEmptyState(),
+                    ] else ...[
+                      for (final session in _archiveSessions) ...[
+                        _buildArchiveSessionCard(session),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (!widget.hideBottomNav) _buildPrimaryNavigation(),
+          ],
+        ),
+      ),
+    );
+
+    // ignore: dead_code
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFFBF8),
@@ -2345,6 +2801,32 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildArchiveEmptyState() {
+    return SizedBox(
+      height: 300,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 64,
+            color: Color(0xFFD9D9D9),
+          ),
+          SizedBox(height: 12),
+          Text(
+            '보관된 채팅이 없어요.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF212121),
+              height: 1.125,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // ignore: dead_code
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
       decoration: BoxDecoration(
@@ -2402,6 +2884,96 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildArchiveSessionCard(ArchiveSessionSummary session) {
+    return GestureDetector(
+      onTap: () => _showArchiveSessionDetail(session),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 120),
+        padding: const EdgeInsets.all(19),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0D000000),
+              blurRadius: 12,
+              offset: Offset(0, 0),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    session.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF212121),
+                      height: 1.43,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _formatArchiveCardDate(session.lastMessageAt),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF999999),
+                    height: 1.17,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Image.asset(
+                  'assets/icon/AI.png',
+                  width: 16,
+                  height: 16,
+                  errorBuilder: (context, error, _) => const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 16,
+                    color: Color(0xFF606C80),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'AI 요약',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF606C80),
+                    height: 1.17,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              session.summary.isEmpty ? '아직 요약된 내용이 없어요.' : session.summary,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF5D5B5B),
+                height: 1.33,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // ignore: dead_code
     return InkWell(
       onTap: () => _showArchiveSessionDetail(session),
       borderRadius: BorderRadius.circular(24),
@@ -2508,13 +3080,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
         onReboTap: _openChatHome,
         onSuggestionTap: _openChatHomeWithPrefill,
         showOnboarding: _showChatThinQOnboarding,
-        onDismissOnboarding: _dismissChatThinQOnboarding,
+        onDismissOnboarding: _advanceToChatReboOnboarding,
       ),
       bottomNavigationBar: widget.hideBottomNav
           ? null
           : _buildPrimaryNavigation(),
     );
 
+    // ignore: dead_code
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFFBF8),
@@ -3063,9 +3636,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   shape: BoxShape.circle,
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    _characterAssetForMode(AssistantMode.audio),
-                    fit: BoxFit.cover,
+                  child: Transform.scale(
+                    scale: 1.2,
+                    child: Image.asset(
+                      _characterAssetForMode(AssistantMode.audio),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
@@ -3077,6 +3653,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   height: 1.33,
+                  fontFamily: 'Pretendard',
                 ),
               ),
               const SizedBox(height: 12),
@@ -3116,7 +3693,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
       );
     }
 
-    // 오디오 녹음 중 화면
     if (_isRecordingActive) {
       return SingleChildScrollView(
         child: Padding(
@@ -3133,9 +3709,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   shape: BoxShape.circle,
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    _characterAssetForMode(AssistantMode.audio),
-                    fit: BoxFit.cover,
+                  child: Transform.scale(
+                    scale: 1.2,
+                    child: Image.asset(
+                      _characterAssetForMode(AssistantMode.audio),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
@@ -3151,6 +3730,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       height: 1.44,
+                      fontFamily: 'Pretendard',
                     ),
                   ),
                 ),
@@ -3177,9 +3757,12 @@ class _MobileHomePageState extends State<MobileHomePage> {
                   shape: BoxShape.circle,
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    _characterAssetForMode(_assistantMode),
-                    fit: BoxFit.cover,
+                  child: Transform.scale(
+                    scale: 1.2,
+                    child: Image.asset(
+                      _characterAssetForMode(_assistantMode),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),
@@ -3196,8 +3779,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 fontSize: isIdle ? 14 : 18,
                 fontWeight: FontWeight.w600,
                 height: 1.44,
+                fontFamily: _modePresentation.fontFamily,
               ),
             ),
+            const SizedBox(height: 8),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.fromLTRB(10, 6, 14, 6),
@@ -3208,19 +3793,21 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.photo_camera_outlined,
-                    size: 13,
-                    color: Color(0xFFEB4C4C),
+                children: [
+                  Image.asset(
+                    'assets/icon/AI.png',
+                    width: 13,
+                    height: 13,
+                    color: const Color(0xFFEB4C4C),
                   ),
-                  SizedBox(width: 5),
-                  Text(
+                  const SizedBox(width: 5),
+                  const Text(
                     '사진/음성으로 더 정확한 진단이 가능해요',
                     style: TextStyle(
                       color: Color(0xFFEB4C4C),
                       fontSize: 11,
                       fontWeight: FontWeight.w400,
+                      fontFamily: 'Pretendard',
                     ),
                   ),
                 ],
@@ -3232,35 +3819,81 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 '보유 중인 제품으로 접수하기',
                 style: TextStyle(
                   color: Color(0xFF212121),
-                  fontSize: 13,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   height: 1.4,
+                  fontFamily: 'Pretendard',
                 ),
               ),
               const SizedBox(height: 11),
-              Row(
-                children: [
-                  _ReboProductCard(
-                    assetPath: 'assets/icon/home_washing.png',
-                    label: '세탁기',
-                    onTap: () {},
-                  ),
-                  const SizedBox(width: 8),
-                  _ReboProductCard(
-                    assetPath: 'assets/icon/home_refrigerator.png',
-                    label: '냉장고',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _ReboProductCard(
-                assetPath: 'assets/icon/home_air.png',
-                label: '에어컨',
-                onTap: () {},
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const gap = 12.0;
+                  final slotWidth = (constraints.maxWidth - (gap * 3)) / 4;
+                  final cardWidth = (slotWidth * 2) + gap;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _ReboProductCard(
+                            width: cardWidth,
+                            assetPath: 'assets/icon/home_washing.png',
+                            label: '세탁기',
+                            onTap: () {},
+                          ),
+                          const SizedBox(width: gap),
+                          _ReboProductCard(
+                            width: cardWidth,
+                            assetPath: 'assets/icon/home_refrigerator.png',
+                            label: '냉장고',
+                            onTap: () {},
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _ReboProductCard(
+                        width: cardWidth,
+                        assetPath: 'assets/icon/home_air.png',
+                        label: '에어컨',
+                        onTap: () {},
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReboAvatar({
+    required double size,
+    AssistantMode mode = AssistantMode.maincharacter,
+  }) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFAABE),
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: Transform.scale(
+          scale: 1.2,
+          child: Image.asset(
+            _characterAssetForMode(mode),
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (context, error, stackTrace) => Image.asset(
+              _characterAssetForMode(AssistantMode.idle),
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
+            ),
+          ),
         ),
       ),
     );
@@ -3345,10 +3978,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 dropdownColor: const Color(0xFF2C2C2C),
                 underline: const SizedBox.shrink(),
                 style: const TextStyle(color: Colors.white, fontSize: 14),
-                items: _demoUsers.map((u) => DropdownMenuItem(
-                  value: u.$1,
-                  child: Text('${u.$2} (ID ${u.$1})'),
-                )).toList(),
+                items: _demoUsers
+                    .map(
+                      (u) => DropdownMenuItem(
+                        value: u.$1,
+                        child: Text('${u.$2} (ID ${u.$1})'),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) {
                   if (val == null) return;
                   final name = _demoUsers.firstWhere((u) => u.$1 == val).$2;
@@ -3386,7 +4023,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
               decoration: InputDecoration(
                 fillColor: Colors.white.withValues(alpha: 0.08),
                 hintText: 'http://192.168.0.13:8000',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -3679,6 +4318,254 @@ class _MobileHomePageState extends State<MobileHomePage> {
     );
   }
 
+  ({Color dotColor, String label}) _diagnosisSeverityMeta(int level) {
+    switch (level) {
+      case 1:
+        return (dotColor: const Color(0xFF22B24C), label: '자가 해결 가능');
+      case 2:
+        return (dotColor: const Color(0xFFF2B529), label: '확인 필요');
+      case 3:
+        return (dotColor: const Color(0xFFE9524A), label: '전문가 필요');
+      case 4:
+        return (dotColor: const Color(0xFFC53E3E), label: '긴급');
+      default:
+        return (dotColor: const Color(0xFF606C80), label: '진단 결과');
+    }
+  }
+
+  Future<void> _toggleResponseAudio(String text) async {
+    final cleaned = _stripDiagnosisStatusFromMessage(text);
+    if (cleaned.isEmpty) {
+      return;
+    }
+
+    if (_autoSpeak) {
+      if (mounted) {
+        setState(() => _autoSpeak = false);
+      }
+      await _stopSpeaking();
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _autoSpeak = true);
+    }
+    await _speakText(cleaned);
+  }
+
+  String _stripDiagnosisStatusFromMessage(String text) {
+    const labels = [
+      '자가 해결 가능',
+      '자가조치가능',
+      '자가 조치 가능',
+      '확인 필요',
+      '전문가 필요',
+      '긴급',
+      '진단 결과',
+      '🟢 자가 해결 가능',
+      '🟢 자가조치가능',
+      '🟢 자가 조치 가능',
+      '🟡 확인 필요',
+      '🟠 전문가 필요',
+      '🔴 긴급',
+    ];
+
+    var cleaned = text
+        .replaceAll(
+          RegExp(
+            r'^\s*severity[_ ]?level\s*[:=]\s*[^,\n]+,?\s*$',
+            caseSensitive: false,
+            multiLine: true,
+          ),
+          '',
+        )
+        .replaceAll(
+          RegExp(
+            r'\bseverity[_ ]?level\s*[:=]\s*[^,\n]+',
+            caseSensitive: false,
+            multiLine: true,
+          ),
+          '',
+        )
+        .replaceAll(
+          RegExp(
+            r'\bseverity[_ ]?level\b',
+            caseSensitive: false,
+            multiLine: true,
+          ),
+          '',
+        )
+        .trim();
+
+    for (final label in labels) {
+      cleaned = cleaned.replaceAll(
+        RegExp('^\\s*${RegExp.escape(label)}\\s*[:-]?\\s*\$', multiLine: true),
+        '',
+      );
+      cleaned = cleaned.replaceFirst(
+        RegExp('^\\s*${RegExp.escape(label)}\\s*[:-]?\\s*'),
+        '',
+      );
+    }
+
+    final filteredLines = cleaned.split('\n').where((line) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) {
+        return false;
+      }
+
+      if (RegExp(
+        r'^severity[_ ]?level\b',
+        caseSensitive: false,
+      ).hasMatch(trimmed)) {
+        return false;
+      }
+
+      return !labels.any(
+        (label) =>
+            trimmed == label ||
+            trimmed == '$label:' ||
+            trimmed == '$label：' ||
+            trimmed == '$label -' ||
+            trimmed.startsWith('$label: ') ||
+            trimmed.startsWith('$label： ') ||
+            trimmed.startsWith('$label - '),
+      );
+    }).toList();
+
+    if (filteredLines.isNotEmpty) {
+      cleaned = filteredLines.join('\n').trim();
+    }
+
+    return cleaned;
+  }
+
+  Widget _buildDiagnosisSeverityChip(int level) {
+    final meta = _diagnosisSeverityMeta(level);
+
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.70),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: meta.dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            meta.label,
+            style: const TextStyle(
+              color: Color(0xFF606C80),
+              fontSize: 12,
+              height: 1.17,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Pretendard',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiagnosisAudioChip(String message) {
+    final color = _autoSpeak
+        ? const Color(0xFF212121)
+        : const Color(0xFF606C80);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => unawaited(_toggleResponseAudio(message)),
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.70),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _autoSpeak ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                size: 16,
+                color: color,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'AI',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  height: 1.17,
+                  fontWeight: FontWeight.w500,
+                  fontFamily: 'Pretendard',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiagnosedAssistantResponse(
+    ChatTurn turn, {
+    required String message,
+    List<String> assistantImages = const [],
+  }) {
+    final cleanedMessage = _stripDiagnosisStatusFromMessage(message);
+    final textWidgets = cleanedMessage.isEmpty
+        ? const <Widget>[]
+        : _buildInlineContent(
+            cleanedMessage,
+            baseStyle: const TextStyle(
+              color: Color(0xFF212121),
+              fontSize: 13,
+              height: 1.54,
+              fontWeight: FontWeight.w400,
+              fontFamily: 'Pretendard',
+            ),
+            images: assistantImages,
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _buildReboAvatar(size: 80, mode: AssistantMode.maincharacter),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (turn.severityLevel != null)
+              _buildDiagnosisSeverityChip(turn.severityLevel!),
+            _buildDiagnosisAudioChip(cleanedMessage),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: textWidgets,
+        ),
+      ],
+    );
+  }
+
   Widget _buildAgentStepChips(List<Map<String, dynamic>> steps) {
     if (steps.isEmpty) return const SizedBox.shrink();
     const labels = <String, (String, String)>{
@@ -3749,20 +4636,20 @@ class _MobileHomePageState extends State<MobileHomePage> {
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isUser ? '고객' : 'AI',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.black.withValues(alpha: 0.42),
-                      fontWeight: FontWeight.w700,
+            if (!isUser)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'AI',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.black.withValues(alpha: 0.42),
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  if (!isUser) ...[
                     const SizedBox(width: 4),
                     InkWell(
                       onTap: () => _speakText(message),
@@ -3777,9 +4664,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
-            ),
             Container(
               padding: EdgeInsets.symmetric(
                 horizontal: isUser ? 12 : 14,
@@ -4244,7 +5130,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                   SizedBox(height: 10),
-                  Text('사진 촬영, 갤러리 가져오기, 음성 녹음, 음성 파일 가져오기를 한 번에 열 수 있어요.'),
+                  Text('사진 촬영, 갤러리 가져오기, 이미지/음성 파일 선택, 음성 녹음을 한 번에 열 수 있어요.'),
                 ],
               ),
             ),
@@ -4359,12 +5245,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Image.asset(
-          _characterAssetForMode(AssistantMode.idle),
-          width: 80,
-          height: 80,
-          fit: BoxFit.contain,
-        ),
+        _buildReboAvatar(size: 80, mode: AssistantMode.maincharacter),
         const SizedBox(height: 16),
         const Text(
           'AS 신청이 필요하시군요!\n그 전에 자가점검은 어떠신가요?',
@@ -4400,57 +5281,24 @@ class _MobileHomePageState extends State<MobileHomePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             chip('자가점검', () {
-              setState(() {
-                _history = [
-                  ..._history,
-                  const ChatTurn(user: '자가점검', assistant: '__SELF_CHECK__'),
-                ];
-              });
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _scrollController.animateTo(
-                  _scrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              });
+              _appendLocalAssistantTurn(
+                user: '자가점검',
+                assistant: '__SELF_CHECK__',
+              );
             }),
             const SizedBox(width: 6),
-            chip('서비스 전문 상담', () {
-              setState(() {
-                _history = [
-                  ..._history,
-                  const ChatTurn(
-                    user: '서비스 전문 상담',
-                    assistant: '__SERVICE_CONSULT__',
-                  ),
-                ];
-              });
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _scrollController.animateTo(
-                  _scrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              });
+            chip('상담 서비스', () {
+              _appendLocalAssistantTurn(
+                user: '상담 서비스',
+                assistant: '__SERVICE_CONSULT__',
+              );
             }),
             const SizedBox(width: 6),
-            chip('출장 서비스 예약', () {
-              setState(() {
-                _history = [
-                  ..._history,
-                  const ChatTurn(
-                    user: '출장 서비스 예약',
-                    assistant: '__VISIT_SERVICE__',
-                  ),
-                ];
-              });
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _scrollController.animateTo(
-                  _scrollController.position.maxScrollExtent,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
-                );
-              });
+            chip('출장 서비스', () {
+              _appendLocalAssistantTurn(
+                user: '출장 서비스',
+                assistant: '__VISIT_SERVICE__',
+              );
             }),
           ],
         ),
@@ -4490,17 +5338,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '서비스 전문 상담을 도와드릴게요!',
+          '상담 서비스 예약을 도와드릴게요!',
           style: TextStyle(
             color: Color(0xFF212121),
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: FontWeight.w600,
             height: 1.44,
           ),
         ),
         const SizedBox(height: 8),
         const Text(
-          '서비스 전문 상담을 예약하실 수 있도록 도와드리겠습니다. 다음 링크를 통해 서비스 전문 상담을 진행하실 수 있어요.',
+          '아래 버튼을 클릭해 상담 서비스 예약에 필요한 제품 정보와 개인정보를 입력해 주세요.',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 14,
@@ -4509,27 +5357,214 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
         ),
         const SizedBox(height: 12),
-        GestureDetector(
+        _buildServiceActionChip(
+          '상담 서비스 예약',
           onTap: () {
-            _messageController.text = '서비스 전문 상담';
-            _sendMessage();
+            unawaited(_openServiceConsultBookingScreen());
           },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.70),
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
-            ),
-            child: const Text(
-              '서비스 전문 상담',
-              style: TextStyle(
-                color: Color(0xFFEB4C4C),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServiceCompletionDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 58,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF8B8681),
                 fontSize: 12,
-                fontWeight: FontWeight.w400,
-                height: 1.4,
+                fontWeight: FontWeight.w600,
+                height: 1.33,
               ),
             ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF212121),
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                height: 1.46,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceConsultCompletionResponse(
+    _ServiceConsultCompletionMessage payload,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildReboAvatar(size: 80, mode: AssistantMode.maincharacter),
+        const SizedBox(height: 16),
+        const Text(
+          '상담 서비스 예약이 완료됐어요!',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '홈 > 메뉴 > 상담 서비스 예약 페이지를 통해 예약 내역을 확인할 수 있어요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '예약 내역',
+                style: TextStyle(
+                  color: Color(0xFF212121),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.43,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildServiceCompletionDetailRow(
+                '제품',
+                '${payload.product} / ${payload.productType}',
+              ),
+              _buildServiceCompletionDetailRow('증상', payload.symptom),
+              _buildServiceCompletionDetailRow(
+                '예약',
+                '${payload.reservationDate} ${payload.reservationTime}',
+              ),
+              _buildServiceCompletionDetailRow('이름', payload.name),
+              _buildServiceCompletionDetailRow('연락처', payload.phoneNumber),
+              _buildServiceCompletionDetailRow('주소', payload.address),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServiceConsultCancellationResponse() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildReboAvatar(size: 80, mode: AssistantMode.maincharacter),
+        const SizedBox(height: 16),
+        const Text(
+          '상담 서비스 예약이 취소됐어요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '다시 예약 진행을 희망한다면 "상담 서비스 예약" 페이지를 통해 다시 예약을 진행해주세요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildServiceActionChip(
+          '상담 서비스 예약',
+          onTap: () {
+            unawaited(_openServiceConsultBookingScreen());
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVisitServiceCompletionResponse(
+    _ServiceConsultCompletionMessage payload,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildReboAvatar(size: 80, mode: AssistantMode.maincharacter),
+        const SizedBox(height: 16),
+        const Text(
+          '출장 서비스 예약이 완료됐어요!',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '홈 > 메뉴 > 출장 서비스 예약 페이지를 통해 예약 내역을 확인할 수 있어요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '예약 내역',
+                style: TextStyle(
+                  color: Color(0xFF212121),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.43,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildServiceCompletionDetailRow(
+                '제품',
+                '${payload.product} / ${payload.productType}',
+              ),
+              _buildServiceCompletionDetailRow('증상', payload.symptom),
+              _buildServiceCompletionDetailRow(
+                '예약',
+                '${payload.reservationDate} ${payload.reservationTime}',
+              ),
+              _buildServiceCompletionDetailRow('이름', payload.name),
+              _buildServiceCompletionDetailRow('연락처', payload.phoneNumber),
+              _buildServiceCompletionDetailRow('주소', payload.address),
+            ],
           ),
         ),
       ],
@@ -4544,6 +5579,40 @@ class _MobileHomePageState extends State<MobileHomePage> {
           '출장 서비스 예약을 도와드릴게요!',
           style: TextStyle(
             color: Color(0xFF212121),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.44,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          '아래 버튼을 클릭해 출장 서비스 예약에 필요한 제품 정보와 개인정보를 입력해 주세요.',
+          style: TextStyle(
+            color: Color(0xFF212121),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.57,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildServiceActionChip(
+          '출장 서비스 예약',
+          onTap: () {
+            unawaited(_openVisitServiceBookingScreen());
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegacyVisitServiceResponse() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '출장 서비스를 도와드릴게요!',
+          style: TextStyle(
+            color: Color(0xFF212121),
             fontSize: 16,
             fontWeight: FontWeight.w600,
             height: 1.44,
@@ -4551,7 +5620,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '출장 서비스 예약을 예약하실 수 있도록 도와드리겠습니다. 다음 링크를 통해 출장 서비스 예약을 진행하실 수 있어요.',
+          '출장 서비스로 이어질 수 있도록 도와드릴게요. 다음 단계에서 출장 서비스를 진행하실 수 있어요.',
           style: TextStyle(
             color: Color(0xFF212121),
             fontSize: 14,
@@ -4562,7 +5631,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         const SizedBox(height: 12),
         GestureDetector(
           onTap: () {
-            _messageController.text = '출장 서비스 예약';
+            _messageController.text = '출장 서비스';
             _sendMessage();
           },
           child: Container(
@@ -4573,7 +5642,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
               border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
             ),
             child: const Text(
-              '출장 서비스 예약',
+              '출장 서비스',
               style: TextStyle(
                 color: Color(0xFFEB4C4C),
                 fontSize: 12,
@@ -4605,6 +5674,40 @@ class _MobileHomePageState extends State<MobileHomePage> {
             fontWeight: FontWeight.w400,
             height: 1.43,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceActionChip(String label, {required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.70),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: const Color(0xFFFF937E), width: 1.2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFFEB4C4C),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: Color(0xFFEB4C4C),
+            ),
+          ],
         ),
       ),
     );
@@ -4717,14 +5820,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '시리얼 넘버(S/N) 입력',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF212121),
-                  ),
-                ),
+                // const Text(
+                //   '시리얼 넘버(S/N) 입력',
+                //   style: TextStyle(
+                //     fontSize: 18,
+                //     fontWeight: FontWeight.w700,
+                //     color: Color(0xFF212121),
+                //   ),
+                // ),
                 const SizedBox(height: 4),
                 Text(
                   '제품 뒷면 또는 측면 스티커에서 확인할 수 있어요.',
@@ -4805,49 +5908,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
       children: [
-        // 새 채팅 유도 배너
-        GestureDetector(
-          onTap: _resetConversation,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF937E).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFFF937E).withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.add_comment_outlined,
-                  size: 16,
-                  color: Color(0xFFFF937E),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    '다른 증상을 진단하려면 새 채팅을 시작하세요',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFFF937E),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const Text(
-                  '새 채팅 →',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFFF937E),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
         for (var index = 0; index < _history.length; index++) ...[
           _buildBubble(
             _history[index].user,
@@ -4857,52 +5917,157 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
           if (_history[index].assistant.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
-            if (_history[index].assistant == '__AS_ROUTING__') ...[
-              _buildAsRoutingResponse(),
-            ] else if (_history[index].assistant == '__SELF_CHECK__') ...[
-              _buildSelfCheckResponse(),
-            ] else if (_history[index].assistant == '__SERVICE_CONSULT__') ...[
-              _buildServiceConsultResponse(),
-            ] else if (_history[index].assistant == '__VISIT_SERVICE__') ...[
-              _buildVisitServiceResponse(),
-            ] else ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Image.asset(
-                  _characterAssetForMode(AssistantMode.idle),
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (_history[index].severityLevel != null) ...[
-                _buildSeverityBadge(_history[index].severityLevel!),
-                const SizedBox(height: 6),
-              ],
-              if (_history[index].agentSteps.isNotEmpty) ...[
-                _buildAgentStepChips(_history[index].agentSteps),
-                const SizedBox(height: 4),
-              ],
-              _buildBubble(
-                index == _streamingTurnIndex
-                    ? '$_streamingText▌'
-                    : _history[index].assistant,
-                isUser: false,
-                assistantImages: index == _streamingTurnIndex
-                    ? const []
-                    : _history[index].assistantImages,
-              ),
-            ],
+            Builder(
+              builder: (context) {
+                final raw = _history[index].assistant;
+                const asRoutingMarker = '\n__AS_ROUTING__';
+                const consultMarker = '\n__SERVICE_CONSULT__';
+                const visitMarker = '\n__VISIT_SERVICE__';
+                final completionPayload =
+                    _decodeServiceConsultCompletionMessage(raw);
+
+                String? extractMarkerPrefix(String marker, String markerOnly) {
+                  if (raw == markerOnly) {
+                    return '';
+                  }
+                  if (raw.contains(marker)) {
+                    return raw.substring(0, raw.indexOf(marker)).trim();
+                  }
+                  return null;
+                }
+
+                final asDiagnosisText = extractMarkerPrefix(
+                  asRoutingMarker,
+                  '__AS_ROUTING__',
+                );
+                final consultDiagnosisText = extractMarkerPrefix(
+                  consultMarker,
+                  '__SERVICE_CONSULT__',
+                );
+                final visitDiagnosisText = extractMarkerPrefix(
+                  visitMarker,
+                  '__VISIT_SERVICE__',
+                );
+                final visitCompletionPayload =
+                    _decodeVisitServiceCompletionMessage(raw);
+
+                final hasAsRouting = asDiagnosisText != null;
+
+                Widget buildDiagnosedServiceResponse({
+                  required String? diagnosisText,
+                  required Widget child,
+                }) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (diagnosisText != null &&
+                          diagnosisText.isNotEmpty) ...[
+                        _buildDiagnosedAssistantResponse(
+                          _history[index],
+                          message: diagnosisText,
+                          assistantImages: _history[index].assistantImages,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      child,
+                    ],
+                  );
+                }
+
+                if (completionPayload != null) {
+                  return _buildServiceConsultCompletionResponse(
+                    completionPayload,
+                  );
+                }
+                if (visitCompletionPayload != null) {
+                  return _buildVisitServiceCompletionResponse(
+                    visitCompletionPayload,
+                  );
+                }
+                if (raw == _serviceConsultCancelMarker) {
+                  return _buildServiceConsultCancellationResponse();
+                }
+                if (raw == '__SELF_CHECK__') return _buildSelfCheckResponse();
+                if (consultDiagnosisText != null) {
+                  return buildDiagnosedServiceResponse(
+                    diagnosisText: consultDiagnosisText,
+                    child: _buildServiceConsultResponse(),
+                  );
+                }
+                if (visitDiagnosisText != null) {
+                  return buildDiagnosedServiceResponse(
+                    diagnosisText: visitDiagnosisText,
+                    child: _buildVisitServiceResponse(),
+                  );
+                }
+
+                if (hasAsRouting) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (asDiagnosisText.isNotEmpty) ...[
+                        _buildDiagnosedAssistantResponse(
+                          _history[index],
+                          message: asDiagnosisText,
+                          assistantImages: _history[index].assistantImages,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      _buildAsRoutingResponse(),
+                    ],
+                  );
+                }
+
+                if (_history[index].severityLevel != null) {
+                  return _buildDiagnosedAssistantResponse(
+                    _history[index],
+                    message: index == _streamingTurnIndex
+                        ? '$_streamingText▌'
+                        : raw,
+                    assistantImages: index == _streamingTurnIndex
+                        ? const []
+                        : _history[index].assistantImages,
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _buildReboAvatar(
+                        size: 80,
+                        mode: AssistantMode.maincharacter,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBubble(
+                      index == _streamingTurnIndex ? '$_streamingText▌' : raw,
+                      isUser: false,
+                      assistantImages: index == _streamingTurnIndex
+                          ? const []
+                          : _history[index].assistantImages,
+                    ),
+                  ],
+                );
+              },
+            ),
             // 마지막 응답이고, 텍스트만 입력한 경우(이미지/오디오 없음) 제안 칩 표시
             if (index == _history.length - 1 &&
                 !_isSubmitting &&
                 _serviceRoutingStep == ServiceRoutingStep.none &&
                 _history[index].userImagePath == null &&
                 _history[index].assistant != '__AS_ROUTING__' &&
+                !_history[index].assistant.contains('\n__AS_ROUTING__') &&
                 _history[index].assistant != '__SELF_CHECK__' &&
                 _history[index].assistant != '__SERVICE_CONSULT__' &&
-                _history[index].assistant != '__VISIT_SERVICE__') ...[
+                _history[index].assistant != '__VISIT_SERVICE__' &&
+                _history[index].assistant != _serviceConsultCancelMarker &&
+                !_history[index].assistant.startsWith(
+                  _serviceConsultCompleteMarker,
+                ) &&
+                !_history[index].assistant.startsWith(
+                  _visitServiceCompleteMarker,
+                )) ...[
               const SizedBox(height: 12),
               if (_isAfterCategoryOrSerial(_history[index].user)) ...[
                 // AS 안내 텍스트
@@ -4961,16 +6126,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: [
-                    _buildSuggestionChip(
-                      '세부 카테고리 선택',
-                      onTap: _showCategorySheet,
-                    ),
-                    _buildSuggestionChip(
-                      '시리얼 넘버(S/N) 찾기',
-                      onTap: _showSerialNumberSheet,
-                    ),
-                  ],
+                  // children: [
+                  //   _buildSuggestionChip(
+                  //     '세부 카테고리 선택',
+                  //     onTap: _showCategorySheet,
+                  //   ),
+                  //   _buildSuggestionChip(
+                  //     '시리얼 넘버(S/N) 찾기',
+                  //     onTap: _showSerialNumberSheet,
+                  //   ),
+                  // ],
                 ),
               ],
             ],
@@ -5185,55 +6350,29 @@ class _MobileHomePageState extends State<MobileHomePage> {
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => _handleServiceActionSelection('상담사 연결'),
-                    icon: const Icon(Icons.support_agent_rounded, size: 18),
-                    label: const Text('상담사 연결'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: const Color(0xFFFFECE8),
-                      foregroundColor: const Color(0xFF9C3F36),
-                    ),
-                  ),
+                _buildSuggestionChip(
+                  '자가점검',
+                  onTap: _isSubmitting
+                      ? () {}
+                      : () => _handleServiceActionSelection('자가점검'),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => _handleServiceActionSelection('출장서비스 예약'),
-                    icon: const Icon(
-                      Icons.home_repair_service_rounded,
-                      size: 18,
-                    ),
-                    label: const Text('출장서비스 예약'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: const Color(0xFFFFF3E8),
-                      foregroundColor: const Color(0xFF9B5A20),
-                    ),
-                  ),
+                _buildSuggestionChip(
+                  '상담 서비스',
+                  onTap: _isSubmitting
+                      ? () {}
+                      : () => _handleServiceActionSelection('상담 서비스'),
+                ),
+                _buildSuggestionChip(
+                  '출장 서비스',
+                  onTap: _isSubmitting
+                      ? () {}
+                      : () => _handleServiceActionSelection('출장 서비스'),
                 ),
               ],
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: _isSubmitting ? null : _startAiDiagnosisFromRouting,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF9C3F36),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 4,
-                  ),
-                ),
-                child: const Text('먼저 AI 진단해보기'),
-              ),
             ),
           ],
         ],
@@ -5269,10 +6408,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(999),
                       boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0DFD312E),
-                          blurRadius: 8,
-                        ),
+                        BoxShadow(color: Color(0x0DFD312E), blurRadius: 8),
                       ],
                     ),
                     child: Row(
@@ -5299,19 +6435,20 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             enabled: !_isSubmitting,
                             minLines: 1,
                             maxLines: 4,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
                               height: 1.45,
                               color: Color(0xFF212121),
+                              fontFamily: _modePresentation.fontFamily,
                             ),
                             decoration: InputDecoration(
                               hintText: _modePresentation.hintText,
-                              hintStyle: const TextStyle(
+                              hintStyle: TextStyle(
                                 fontSize: 12.5,
                                 height: 1.15,
                                 color: Color(0xFF5D5B5B),
                                 fontWeight: FontWeight.w400,
-                                fontFamily: 'Pretendard',
+                                fontFamily: _modePresentation.fontFamily,
                               ),
                               filled: false,
                               fillColor: Colors.transparent,
@@ -5361,9 +6498,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                                   fit: BoxFit.contain,
                                   filterQuality: FilterQuality.medium,
                                   color: showMicAction
-                                      ? const Color(0xFF606C80).withValues(
-                                          alpha: 0.35,
-                                        )
+                                      ? const Color(
+                                          0xFF606C80,
+                                        ).withValues(alpha: 0.35)
                                       : const Color(0xFFFF937E),
                                   colorBlendMode: BlendMode.srcIn,
                                 ),
@@ -5482,8 +6619,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
   }
 
   Widget _buildChatScreen() {
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: const Color(0xFFFCEDEB),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -5492,95 +6630,91 @@ class _MobileHomePageState extends State<MobileHomePage> {
         automaticallyImplyLeading: false,
         centerTitle: false,
         toolbarHeight: 40,
-        titleSpacing: 19,
-        title: PopupMenuButton<String>(
-          tooltip: '',
-          padding: EdgeInsets.zero,
-          offset: const Offset(0, 34),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          color: Colors.white,
-          elevation: 10,
-          onSelected: (_) => setState(() => _showWelcomeScreen = true),
-          itemBuilder: (context) => const [
-            PopupMenuItem<String>(
-              value: 'chatthinq',
-              child: Text(
-                'ChatThinQ',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Pretendard',
-                ),
-              ),
-            ),
-          ],
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Chat REBO',
-                style: TextStyle(
-                  color: Color(0xFF212121),
-                  fontSize: 20,
-                  height: 1.1,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Pretendard',
-                ),
-              ),
-              const SizedBox(width: 6),
-              Image.asset(
-                'assets/icon/down.png',
-                width: 18,
-                height: 18,
-                fit: BoxFit.contain,
-                filterQuality: FilterQuality.medium,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          if (_history.isNotEmpty)
-            GestureDetector(
-              onTap: _resetConversation,
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF937E).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: const Text(
-                  '새 채팅',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFFF937E),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 19),
+          child: SizedBox(
+            height: 40,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                PopupMenuButton<String>(
+                  tooltip: '',
+                  padding: EdgeInsets.zero,
+                  offset: const Offset(0, 34),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  color: Colors.white,
+                  elevation: 10,
+                  onSelected: (_) => setState(() => _showWelcomeScreen = true),
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<String>(
+                      value: 'chatthinq',
+                      child: Text(
+                        'ChatThinQ',
+                        style: TextStyle(
+                          color: Color(0xFF212121),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Pretendard',
+                        ),
+                      ),
+                    ),
+                  ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Chat REBO',
+                        style: TextStyle(
+                          color: Color(0xFF212121),
+                          fontSize: 20,
+                          height: 1.1,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Pretendard',
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Image.asset(
+                        'assets/icon/down.png',
+                        width: 18,
+                        height: 18,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.medium,
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _TopNavigationAssetIconButton(
+                      tooltip: '새 채팅',
+                      assetPath: 'assets/icon/chat_newchat.png',
+                      iconSize: 20,
+                      onPressed: _resetConversation,
+                    ),
+                    _TopNavigationAssetIconButton(
+                      tooltip: '보관함',
+                      assetPath: 'assets/icon/chat_arhive.png',
+                      iconSize: 20,
+                      onPressed: _openArchiveScreen,
+                    ),
+                    _TopNavigationAssetIconButton(
+                      tooltip: '채팅 닫기',
+                      assetPath: 'assets/icon/close.png',
+                      onPressed: () => setState(() {
+                        _showWelcomeScreen = true;
+                        _showArchiveScreen = false;
+                      }),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          _TopBarIconButton(
-            tooltip: '보관함',
-            onPressed: _openArchiveScreen,
-            child: const _ArchiveOutlineIcon(),
           ),
-          const SizedBox(width: 2),
-          _TopBarIconButton(
-            tooltip: '채팅 닫기',
-            onPressed: () => setState(() {
-              _showWelcomeScreen = true;
-              _showArchiveScreen = false;
-            }),
-            child: const _CloseOutlineIcon(),
-          ),
-          const SizedBox(width: 10),
-        ],
+        ),
       ),
       body: Stack(
         children: [
@@ -5588,6 +6722,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           SafeArea(
             child: Column(
               children: [
+                const SizedBox(height: 52),
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
@@ -5620,8 +6755,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
                         'AI가 생성한 응답은 부정확할 수 있습니다.',
                         style: TextStyle(
                           color: Color(0xFF5D5B5B),
-                          fontSize: 12,
+                          fontSize: 10,
+                          height: 1.2,
                           fontWeight: FontWeight.w400,
+                          fontFamily: 'Pretendard',
                         ),
                       ),
                       SizedBox(width: 4),
@@ -5644,6 +6781,37 @@ class _MobileHomePageState extends State<MobileHomePage> {
           ),
         ],
       ),
+    );
+
+    if (!_showChatReboOnboarding) {
+      return scaffold;
+    }
+
+    return Stack(
+      children: [
+        scaffold,
+        const Positioned.fill(
+          child: AbsorbPointer(child: ColoredBox(color: Color(0x59000000))),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 19),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 58,
+                  child: _ChatReboOnboardingCard(
+                    step: _chatReboOnboardingStep,
+                    onTap: _dismissChatReboOnboarding,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -5736,6 +6904,1374 @@ class ArchiveMessage {
   }
 }
 
+enum _ServiceConsultBookingStep { productInfo, customerInfo, scheduleInfo }
+
+class _ServiceConsultBookingDraft extends ServiceBookingDraft {
+  const _ServiceConsultBookingDraft({
+    required super.product,
+    required super.productType,
+    required super.symptom,
+    required super.name,
+    required super.phoneNumber,
+    required super.address,
+    required super.detailAddress,
+    required super.reservationDate,
+    required super.reservationTime,
+    super.detailedSymptom,
+  });
+}
+
+const _serviceConsultCompleteMarker = '__SERVICE_CONSULT_COMPLETE__';
+const _serviceConsultCancelMarker = '__SERVICE_CONSULT_CANCEL__';
+const _visitServiceCompleteMarker = '__VISIT_SERVICE_COMPLETE__';
+
+class _ServiceConsultCompletionMessage {
+  const _ServiceConsultCompletionMessage({
+    required this.name,
+    required this.product,
+    required this.productType,
+    required this.symptom,
+    required this.phoneNumber,
+    required this.address,
+    required this.reservationDate,
+    required this.reservationTime,
+  });
+
+  factory _ServiceConsultCompletionMessage.fromDraft(
+    ServiceBookingDraft draft,
+  ) {
+    final symptom = draft.detailedSymptom == null
+        ? draft.symptom
+        : '${draft.symptom} · ${draft.detailedSymptom}';
+    final address = draft.detailAddress.trim().isEmpty
+        ? draft.address
+        : '${draft.address} ${draft.detailAddress.trim()}';
+
+    return _ServiceConsultCompletionMessage(
+      name: draft.name,
+      product: draft.product,
+      productType: draft.productType,
+      symptom: symptom,
+      phoneNumber: draft.phoneNumber,
+      address: address,
+      reservationDate: draft.reservationDate,
+      reservationTime: draft.reservationTime,
+    );
+  }
+
+  factory _ServiceConsultCompletionMessage.fromJson(Map<String, dynamic> json) {
+    return _ServiceConsultCompletionMessage(
+      name: json['name']?.toString().trim() ?? '',
+      product: json['product']?.toString().trim() ?? '',
+      productType: json['productType']?.toString().trim() ?? '',
+      symptom: json['symptom']?.toString().trim() ?? '',
+      phoneNumber: json['phoneNumber']?.toString().trim() ?? '',
+      address: json['address']?.toString().trim() ?? '',
+      reservationDate: json['reservationDate']?.toString().trim() ?? '',
+      reservationTime: json['reservationTime']?.toString().trim() ?? '',
+    );
+  }
+
+  final String name;
+  final String product;
+  final String productType;
+  final String symptom;
+  final String phoneNumber;
+  final String address;
+  final String reservationDate;
+  final String reservationTime;
+
+  Map<String, String> toJson() => {
+    'name': name,
+    'product': product,
+    'productType': productType,
+    'symptom': symptom,
+    'phoneNumber': phoneNumber,
+    'address': address,
+    'reservationDate': reservationDate,
+    'reservationTime': reservationTime,
+  };
+}
+
+String _encodeServiceConsultCompletionMessage(ServiceBookingDraft draft) {
+  final payload = _ServiceConsultCompletionMessage.fromDraft(draft);
+  return '$_serviceConsultCompleteMarker\n${jsonEncode(payload.toJson())}';
+}
+
+String _encodeVisitServiceCompletionMessage(ServiceBookingDraft draft) {
+  final payload = _ServiceConsultCompletionMessage.fromDraft(draft);
+  return '$_visitServiceCompleteMarker\n${jsonEncode(payload.toJson())}';
+}
+
+_ServiceConsultCompletionMessage? _decodeServiceConsultCompletionMessage(
+  String raw,
+) {
+  if (!raw.startsWith(_serviceConsultCompleteMarker)) {
+    return null;
+  }
+
+  final payload = raw.substring(_serviceConsultCompleteMarker.length).trim();
+  if (payload.isEmpty) {
+    return null;
+  }
+
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map) {
+      return null;
+    }
+    return _ServiceConsultCompletionMessage.fromJson(
+      Map<String, dynamic>.from(decoded),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+_ServiceConsultCompletionMessage? _decodeVisitServiceCompletionMessage(
+  String raw,
+) {
+  if (!raw.startsWith(_visitServiceCompleteMarker)) {
+    return null;
+  }
+
+  final payload = raw.substring(_visitServiceCompleteMarker.length).trim();
+  if (payload.isEmpty) {
+    return null;
+  }
+
+  try {
+    final decoded = jsonDecode(payload);
+    if (decoded is! Map) {
+      return null;
+    }
+    return _ServiceConsultCompletionMessage.fromJson(
+      Map<String, dynamic>.from(decoded),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+String _serializeAssistantForHistory(String assistant) {
+  final completion = _decodeServiceConsultCompletionMessage(assistant);
+  if (completion != null) {
+    return '상담 서비스 예약이 완료됐어요. ${completion.product} ${completion.productType} / ${completion.symptom} / ${completion.reservationDate} ${completion.reservationTime}';
+  }
+  final visitCompletion = _decodeVisitServiceCompletionMessage(assistant);
+  if (visitCompletion != null) {
+    return '출장 서비스 예약이 완료됐어요. ${visitCompletion.product} ${visitCompletion.productType} / ${visitCompletion.symptom} / ${visitCompletion.reservationDate} ${visitCompletion.reservationTime}';
+  }
+  if (assistant.trim() == _serviceConsultCancelMarker) {
+    return '상담 서비스 예약이 취소됐어요. 다시 예약을 원하면 상담 서비스 예약 페이지에서 진행할 수 있어요.';
+  }
+
+  const markerSuffixes = [
+    '\n__AS_ROUTING__',
+    '\n__SERVICE_CONSULT__',
+    '\n__VISIT_SERVICE__',
+  ];
+  for (final marker in markerSuffixes) {
+    if (assistant.contains(marker)) {
+      return assistant.substring(0, assistant.indexOf(marker)).trim();
+    }
+  }
+
+  switch (assistant.trim()) {
+    case '__AS_ROUTING__':
+      return 'AS 신청 관련 안내를 도와드릴게요.';
+    case '__SELF_CHECK__':
+      return '자가점검을 도와드릴게요.';
+    case '__SERVICE_CONSULT__':
+      return '상담 서비스 예약을 도와드릴게요.';
+    case '__VISIT_SERVICE__':
+      return '출장 서비스를 도와드릴게요.';
+    default:
+      return assistant;
+  }
+}
+
+class _ServiceConsultUserProfile {
+  const _ServiceConsultUserProfile({
+    required this.name,
+    required this.phone,
+    required this.address,
+  });
+
+  factory _ServiceConsultUserProfile.fromJson(Map<String, dynamic> json) {
+    return _ServiceConsultUserProfile(
+      name: json['name']?.toString().trim() ?? '',
+      phone: json['phone']?.toString().trim() ?? '',
+      address: json['address']?.toString().trim() ?? '',
+    );
+  }
+
+  final String name;
+  final String phone;
+  final String address;
+}
+
+class _ServiceConsultBookingScreen extends StatefulWidget {
+  const _ServiceConsultBookingScreen({
+    required this.baseUrl,
+    required this.userId,
+    required this.initialUserName,
+    required this.initialPhoneNumber,
+    required this.initialAddress,
+  });
+
+  final String baseUrl;
+  final int userId;
+  final String initialUserName;
+  final String initialPhoneNumber;
+  final String initialAddress;
+
+  @override
+  State<_ServiceConsultBookingScreen> createState() =>
+      _ServiceConsultBookingScreenState();
+}
+
+class _ServiceConsultBookingScreenState
+    extends State<_ServiceConsultBookingScreen> {
+  static const _productOptions = ['냉장고/김치냉장고', '세탁기', '에어컨/환기'];
+
+  static const _productTypeOptions = <String, List<String>>{
+    '냉장고/김치냉장고': ['양문형 냉장고', '일반형 냉장고', '싱냉장/하냉동', '스탠드형 김치냉장고', '뚜껑형 김치냉장고'],
+    '세탁기': ['드럼세탁기', '통돌이 세탁기', '워시타워', '미니세탁기'],
+    '에어컨/환기': [
+      '2in1 에어컨',
+      '스탠드형 에어컨',
+      '벽걸이형 에어컨',
+      '가정용 천장형 에어컨',
+      '상업용 천장형 에어컨',
+      '상업용 스탠드 에어컨',
+    ],
+  };
+
+  static const _symptomOptions = <String, List<String>>{
+    '냉장고/김치냉장고': [
+      '에러코드/표시창',
+      '기능/작동',
+      'ThinQ/스마트기능',
+      '디스펜서/정수기',
+      '구조/외관',
+      '누수/결빙/성에/이슬',
+      '전원/누전',
+      '냉동/냉장',
+      '메뉴/작동 방법',
+      '도어/홈바',
+      '소음/진동',
+      '냄새/이물',
+    ],
+    '세탁기': [
+      '에러코드/표시창',
+      '기능/작동',
+      'ThinQ/스마트기능',
+      '디스펜서/정수기',
+      '구조/외관',
+      '누수/결빙/성에/이슬',
+      '전원/누전',
+      '냉동/냉장',
+      '메뉴/작동 방법',
+      '도어/홈바',
+      '소음/진동',
+      '냄새/이물',
+    ],
+    '에어컨/환기': [
+      '에러코드/표시창',
+      '기능/작동',
+      'ThinQ/스마트기능',
+      '디스펜서/정수기',
+      '구조/외관',
+      '누수/결빙/성에/이슬',
+      '전원/누전',
+      '냉동/냉장',
+      '메뉴/작동 방법',
+      '도어/홈바',
+      '소음/진동',
+      '냄새/이물',
+    ],
+  };
+  static const _timeSlotOptions = [
+    '09:00',
+    '10:00',
+    '11:00',
+    '13:00',
+    '14:00',
+    '15:00',
+    '16:00',
+    '17:00',
+  ];
+
+  String? _selectedProduct;
+  String? _selectedProductType;
+  String? _selectedSymptom;
+  DateTime? _selectedReservationDate;
+  String? _selectedReservationTime;
+  _ServiceConsultBookingStep _currentStep =
+      _ServiceConsultBookingStep.productInfo;
+  final TextEditingController _detailedSymptomController =
+      TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _detailAddressController =
+      TextEditingController();
+
+  bool get _canProceed {
+    switch (_currentStep) {
+      case _ServiceConsultBookingStep.productInfo:
+        return _selectedProduct != null &&
+            _selectedProductType != null &&
+            _selectedSymptom != null;
+      case _ServiceConsultBookingStep.customerInfo:
+        return _nameController.text.trim().isNotEmpty &&
+            _phoneController.text.trim().isNotEmpty &&
+            _addressController.text.trim().isNotEmpty;
+      case _ServiceConsultBookingStep.scheduleInfo:
+        return _selectedReservationDate != null &&
+            _selectedReservationTime != null;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.initialUserName.trim();
+    _phoneController.text = widget.initialPhoneNumber.trim();
+    _addressController.text = widget.initialAddress.trim();
+    unawaited(_prefillUserProfile());
+  }
+
+  @override
+  void dispose() {
+    _detailedSymptomController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _detailAddressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _prefillUserProfile() async {
+    if (widget.userId <= 0 || widget.baseUrl.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('${widget.baseUrl}/api/users/${widget.userId}'),
+      );
+
+      if (response.statusCode != 200) {
+        return;
+      }
+
+      final decoded =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      final rawUser = decoded['user'];
+      if (rawUser is! Map) {
+        return;
+      }
+
+      final profile = _ServiceConsultUserProfile.fromJson(
+        Map<String, dynamic>.from(rawUser),
+      );
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        if (_nameController.text.trim().isEmpty ||
+            _nameController.text.trim() == widget.initialUserName.trim()) {
+          _nameController.text = profile.name;
+        }
+        if (_phoneController.text.trim().isEmpty) {
+          _phoneController.text = profile.phone;
+        }
+        if (_addressController.text.trim().isEmpty) {
+          _addressController.text = profile.address;
+        }
+      });
+    } catch (_) {
+      // 예약 화면은 입력 가능 상태를 유지하고, 조회 실패 시 수동 입력으로 fallback 합니다.
+    }
+  }
+
+  DateTime get _today => DateUtils.dateOnly(DateTime.now());
+
+  DateTime get _firstReservableDate => _today.add(const Duration(days: 1));
+
+  DateTime get _lastReservableDate =>
+      _firstReservableDate.add(const Duration(days: 60));
+
+  DateTime get _defaultReservableDate {
+    var candidate = _firstReservableDate;
+    while (!_isReservableDate(candidate)) {
+      candidate = candidate.add(const Duration(days: 1));
+    }
+    return candidate;
+  }
+
+  bool _isReservableDate(DateTime date) {
+    final normalized = DateUtils.dateOnly(date);
+    return !normalized.isBefore(_firstReservableDate) &&
+        normalized.weekday != DateTime.sunday;
+  }
+
+  Set<String> _unavailableTimeSlotsFor(DateTime date) {
+    if (date.weekday == DateTime.saturday) {
+      return {'15:00', '16:00', '17:00'};
+    }
+    return date.day.isEven ? {'11:00', '16:00'} : {'10:00', '15:00'};
+  }
+
+  String _formatReservationDate(DateTime date) {
+    final normalized = DateUtils.dateOnly(date);
+    final year = normalized.year.toString();
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '$year.$month.$day';
+  }
+
+  Future<void> _showOptionSheet({
+    required String title,
+    required List<String> options,
+    required ValueChanged<String> onSelected,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 24, 14, 14),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF212121),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    fontFamily: 'Pretendard',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...options.map(
+                  (option) => InkWell(
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      onSelected(option);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              option,
+                              style: const TextStyle(
+                                color: Color(0xFF212121),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                height: 1.3,
+                                fontFamily: 'Pretendard',
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: Color(0xFF606C80),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleBack() {
+    if (_currentStep == _ServiceConsultBookingStep.productInfo) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+
+    setState(() {
+      _currentStep = _currentStep == _ServiceConsultBookingStep.scheduleInfo
+          ? _ServiceConsultBookingStep.customerInfo
+          : _ServiceConsultBookingStep.productInfo;
+    });
+  }
+
+  void _handleAddressSearch() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('주소 검색은 준비 중이에요. 주소를 직접 입력해 주세요.')),
+    );
+  }
+
+  void _handleNext() {
+    if (!_canProceed) {
+      return;
+    }
+
+    if (_currentStep == _ServiceConsultBookingStep.productInfo) {
+      setState(() {
+        _currentStep = _ServiceConsultBookingStep.customerInfo;
+      });
+      return;
+    }
+
+    if (_currentStep == _ServiceConsultBookingStep.customerInfo) {
+      setState(() {
+        _selectedReservationDate ??= _defaultReservableDate;
+        if (_selectedReservationDate != null &&
+            _selectedReservationTime != null &&
+            _unavailableTimeSlotsFor(
+              _selectedReservationDate!,
+            ).contains(_selectedReservationTime)) {
+          _selectedReservationTime = null;
+        }
+        _currentStep = _ServiceConsultBookingStep.scheduleInfo;
+      });
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _ServiceConsultBookingDraft(
+        product: _selectedProduct!,
+        productType: _selectedProductType!,
+        symptom: _selectedSymptom!,
+        name: _nameController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        detailAddress: _detailAddressController.text.trim(),
+        reservationDate: _formatReservationDate(_selectedReservationDate!),
+        reservationTime: _selectedReservationTime!,
+        detailedSymptom: _detailedSymptomController.text.trim().isEmpty
+            ? null
+            : _detailedSymptomController.text.trim(),
+      ),
+    );
+  }
+
+  Widget _buildInfoNotice() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 19),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF606C80)),
+          SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              '현재는 일부 제품만 Chat REBO에서 예약할 수 있어요.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF606C80),
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                height: 1.17,
+                fontFamily: 'Pretendard',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF000000),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.125,
+            fontFamily: 'Pretendard',
+          ),
+        ),
+        const SizedBox(width: 4),
+        const Text(
+          '*',
+          style: TextStyle(
+            color: Color(0xFFEB4C4C),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.125,
+            fontFamily: 'Pretendard',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductInfoStep({
+    required List<String> productTypes,
+    required List<String> symptoms,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoNotice(),
+        const SizedBox(height: 32),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 19),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('상담 예약 제품'),
+              const SizedBox(height: 10),
+              _ServiceBookingSelectionField(
+                label: _selectedProduct ?? '어떤 제품에 대해 문의하고 싶으신가요.',
+                isPlaceholder: _selectedProduct == null,
+                onTap: () {
+                  _showOptionSheet(
+                    title: '제품 선택',
+                    options: _productOptions,
+                    onSelected: (value) {
+                      setState(() {
+                        _selectedProduct = value;
+                        _selectedProductType = null;
+                        _selectedSymptom = null;
+                        _detailedSymptomController.clear();
+                      });
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              _ServiceBookingSelectionField(
+                label: _selectedProductType ?? '어떤 유형의 제품인가요.',
+                isPlaceholder: _selectedProductType == null,
+                onTap: productTypes.isEmpty
+                    ? null
+                    : () {
+                        _showOptionSheet(
+                          title: '제품 유형 선택',
+                          options: productTypes,
+                          onSelected: (value) {
+                            setState(() {
+                              _selectedProductType = value;
+                            });
+                          },
+                        );
+                      },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 19),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('자주 묻는 증상'),
+              const SizedBox(height: 10),
+              _ServiceBookingSelectionField(
+                label: _selectedSymptom ?? '증상을 선택해 주세요.',
+                isPlaceholder: _selectedSymptom == null,
+                onTap: symptoms.isEmpty
+                    ? null
+                    : () {
+                        _showOptionSheet(
+                          title: '증상 선택',
+                          options: symptoms,
+                          onSelected: (value) {
+                            setState(() {
+                              _selectedSymptom = value;
+                              _detailedSymptomController.clear();
+                            });
+                          },
+                        );
+                      },
+              ),
+              if (_selectedSymptom != null) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  '세부 증상 입력',
+                  style: TextStyle(
+                    color: Color(0xFF000000),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    fontFamily: 'Pretendard',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(minHeight: 70),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFD3D6D8)),
+                  ),
+                  child: TextField(
+                    controller: _detailedSymptomController,
+                    minLines: 2,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.done,
+                    style: const TextStyle(
+                      color: Color(0xFF212121),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      height: 1.4,
+                      fontFamily: 'Pretendard',
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      hintText: '증상을 자세히 입력해 주세요.',
+                      hintStyle: TextStyle(
+                        color: Color(0xFF9CA4AF),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        height: 1.4,
+                        fontFamily: 'Pretendard',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCustomerInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoNotice(),
+        const SizedBox(height: 40),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 19),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('이름'),
+              const SizedBox(height: 12),
+              _ServiceBookingInputField(
+                controller: _nameController,
+                hintText: '이름을 입력해 주세요.',
+                fillColor: Colors.white,
+                borderColor: const Color(0xFFD3D6D8),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 24),
+              _buildSectionHeader('휴대전화번호'),
+              const SizedBox(height: 12),
+              _ServiceBookingInputField(
+                controller: _phoneController,
+                hintText: '휴대전화번호를 입력해 주세요.',
+                keyboardType: TextInputType.phone,
+                fillColor: Colors.white,
+                borderColor: const Color(0xFFD3D6D8),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 24),
+              _buildSectionHeader('주소'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ServiceBookingInputField(
+                      controller: _addressController,
+                      hintText: '도로명 주소를 입력해 주세요.',
+                      fillColor: Colors.white,
+                      borderColor: const Color(0xFFD3D6D8),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _handleAddressSearch,
+                    child: Container(
+                      width: 88,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFD3D6D8)),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        '주소찾기',
+                        style: TextStyle(
+                          color: Color(0xFF5D5B5B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          height: 1.14,
+                          fontFamily: 'Pretendard',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _ServiceBookingInputField(
+                controller: _detailAddressController,
+                hintText: '상세 주소를 입력해 주세요.',
+                fillColor: Colors.white,
+                borderColor: const Color(0xFFD3D6D8),
+                onChanged: (_) => setState(() {}),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScheduleLegendItem({
+    required Color color,
+    required String label,
+    Color? borderColor,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: borderColor == null ? null : Border.all(color: borderColor),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF5D5B5B),
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            height: 1.23,
+            fontFamily: 'Pretendard',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScheduleInfoStep() {
+    final selectedDate = _selectedReservationDate ?? _defaultReservableDate;
+    final unavailableSlots = _unavailableTimeSlotsFor(selectedDate);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoNotice(),
+        const SizedBox(height: 28),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 19),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('상담 날짜 예약'),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFD3D6D8)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: Theme.of(context).colorScheme.copyWith(
+                          primary: const Color(0xFF606C80),
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: const Color(0xFF212121),
+                        ),
+                      ),
+                      child: CalendarDatePicker(
+                        initialDate: selectedDate,
+                        firstDate: _defaultReservableDate,
+                        lastDate: _lastReservableDate,
+                        currentDate: _today,
+                        selectableDayPredicate: _isReservableDate,
+                        onDateChanged: (value) {
+                          setState(() {
+                            _selectedReservationDate = DateUtils.dateOnly(
+                              value,
+                            );
+                            if (_selectedReservationTime != null &&
+                                _unavailableTimeSlotsFor(
+                                  _selectedReservationDate!,
+                                ).contains(_selectedReservationTime)) {
+                              _selectedReservationTime = null;
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _buildScheduleLegendItem(
+                          color: Colors.white,
+                          borderColor: const Color(0xFFD3D6D8),
+                          label: '예약가능',
+                        ),
+                        _buildScheduleLegendItem(
+                          color: const Color(0xFFEB4C4C),
+                          label: '선택',
+                        ),
+                        _buildScheduleLegendItem(
+                          color: const Color(0xFFE3E6EA),
+                          label: '불가',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildSectionHeader('상담 시간 선택'),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _timeSlotOptions.map((slot) {
+                  final isUnavailable = unavailableSlots.contains(slot);
+                  final isSelected = _selectedReservationTime == slot;
+                  return _ServiceBookingTimeChip(
+                    label: slot,
+                    isSelected: isSelected,
+                    isUnavailable: isUnavailable,
+                    onTap: isUnavailable
+                        ? null
+                        : () {
+                            setState(() {
+                              _selectedReservationTime = slot;
+                            });
+                          },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '출장 점검료 안내',
+                      style: TextStyle(
+                        color: Color(0xFF212121),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        fontFamily: 'Pretendard',
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      '• 챗봇에서는 한 채팅당 1건씩만 예약할 수 있습니다.',
+                      style: TextStyle(
+                        color: Color(0xFF5D5B5B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        height: 1.7,
+                        fontFamily: 'Pretendard',
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '• 무상 보증기간이 지난 경우 출장비는 기본 28,000원, 평일 18시 이후 및 토/일/공휴일은 33,000원이 발생하며 점검 내용에 따라 수리비와 부품비가 추가될 수 있습니다.',
+                      style: TextStyle(
+                        color: Color(0xFF5D5B5B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        height: 1.7,
+                        fontFamily: 'Pretendard',
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '• 서비스 요금은 카드 또는 현금으로만 결제할 수 있으며, 수리 당일 현장에서 결제해야 수리가 진행됩니다.',
+                      style: TextStyle(
+                        color: Color(0xFF5D5B5B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        height: 1.7,
+                        fontFamily: 'Pretendard',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final productTypes = _selectedProduct == null
+        ? const <String>[]
+        : (_productTypeOptions[_selectedProduct!] ?? const <String>[]);
+    final symptoms = _selectedProduct == null
+        ? const <String>[]
+        : (_symptomOptions[_selectedProduct!] ?? const <String>[]);
+    final bodyContent = switch (_currentStep) {
+      _ServiceConsultBookingStep.productInfo => _buildProductInfoStep(
+        productTypes: productTypes,
+        symptoms: symptoms,
+      ),
+      _ServiceConsultBookingStep.customerInfo => _buildCustomerInfoStep(),
+      _ServiceConsultBookingStep.scheduleInfo => _buildScheduleInfoStep(),
+    };
+    final nextButtonLabel =
+        _currentStep == _ServiceConsultBookingStep.scheduleInfo ? '완료' : '다음';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFEFF1F4),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(19, 10, 19, 0),
+              child: SizedBox(
+                height: 40,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 24, height: 24),
+                    const Expanded(
+                      child: Text(
+                        '상담 서비스',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF212121),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          height: 1.11,
+                          fontFamily: 'Pretendard',
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '닫기',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        size: 24,
+                        color: Color(0xFF212121),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(0, 12, 0, 20),
+                child: bodyContent,
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(19, 0, 19, 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _ServiceBookingBottomButton(
+                label: '이전',
+                width: 163,
+                height: 48,
+                backgroundColor: Colors.white.withValues(alpha: 0.7),
+                borderColor: const Color(0xFFD3D6D8),
+                textColor: const Color(0xFF9CA4AF),
+                onTap: _handleBack,
+              ),
+              const SizedBox(width: 11),
+              _ServiceBookingBottomButton(
+                label: nextButtonLabel,
+                width: 163,
+                height: 48,
+                backgroundColor: _canProceed
+                    ? const Color(0xFF606C80)
+                    : const Color(0xFFD3D6D8),
+                textColor: Colors.white,
+                onTap: _canProceed ? _handleNext : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceBookingSelectionField extends StatelessWidget {
+  const _ServiceBookingSelectionField({
+    required this.label,
+    required this.isPlaceholder,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isPlaceholder;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFD3D6D8)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: enabled
+                      ? (isPlaceholder
+                            ? const Color(0xFFB8BEC5)
+                            : const Color(0xFF212121))
+                      : const Color(0xFFD3D6D8),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  height: 1.14,
+                  fontFamily: 'Pretendard',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 20,
+              color: enabled
+                  ? const Color(0xFF606C80)
+                  : const Color(0xFFD3D6D8),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceBookingInputField extends StatelessWidget {
+  const _ServiceBookingInputField({
+    required this.controller,
+    required this.hintText,
+    required this.fillColor,
+    required this.borderColor,
+    this.keyboardType = TextInputType.text,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final Color fillColor;
+  final Color borderColor;
+  final TextInputType keyboardType;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: fillColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      alignment: Alignment.center,
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        onChanged: onChanged,
+        style: const TextStyle(
+          color: Color(0xFF5D5B5B),
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+          height: 1.14,
+          fontFamily: 'Pretendard',
+        ),
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+          hintText: hintText,
+          hintStyle: const TextStyle(
+            color: Color(0xFF9CA4AF),
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            height: 1.14,
+            fontFamily: 'Pretendard',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceBookingTimeChip extends StatelessWidget {
+  const _ServiceBookingTimeChip({
+    required this.label,
+    required this.isSelected,
+    required this.isUnavailable,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final bool isUnavailable;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = isSelected
+        ? const Color(0xFF606C80)
+        : isUnavailable
+        ? const Color(0xFFE3E6EA)
+        : Colors.white;
+    final borderColor = isSelected
+        ? const Color(0xFF606C80)
+        : const Color(0xFFD3D6D8);
+    final textColor = isSelected
+        ? Colors.white
+        : isUnavailable
+        ? const Color(0xFF9CA4AF)
+        : const Color(0xFF5D5B5B);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 76,
+        height: 40,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            height: 1.23,
+            fontFamily: 'Pretendard',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceBookingBottomButton extends StatelessWidget {
+  const _ServiceBookingBottomButton({
+    required this.label,
+    required this.width,
+    required this.height,
+    required this.backgroundColor,
+    required this.textColor,
+    required this.onTap,
+    this.borderColor,
+  });
+
+  final String label;
+  final double width;
+  final double height;
+  final Color backgroundColor;
+  final Color textColor;
+  final Color? borderColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(10),
+          border: borderColor == null ? null : Border.all(color: borderColor!),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            height: 1.125,
+            fontFamily: 'Pretendard',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ModePresentation {
   const _ModePresentation({
     required this.label,
@@ -5744,6 +8280,7 @@ class _ModePresentation {
     required this.hintText,
     required this.gradientColors,
     required this.accent,
+    required this.fontFamily,
   });
 
   final String label;
@@ -5752,15 +8289,18 @@ class _ModePresentation {
   final String hintText;
   final List<Color> gradientColors;
   final Color accent;
+  final String fontFamily;
 }
 
 class _ReboProductCard extends StatelessWidget {
   const _ReboProductCard({
+    this.width = 165,
     required this.assetPath,
     required this.label,
     required this.onTap,
   });
 
+  final double width;
   final String assetPath;
   final String label;
   final VoidCallback onTap;
@@ -5770,29 +8310,29 @@ class _ReboProductCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 154,
-        height: 49,
-        padding: const EdgeInsets.only(left: 12),
+        width: width,
+        height: 56,
+        padding: const EdgeInsets.only(left: 18),
         decoration: BoxDecoration(
           color: const Color(0x0D212121),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
               assetPath,
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.medium,
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 10),
             Text(
               label,
               style: const TextStyle(
                 color: Color(0xFF212121),
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w400,
                 height: 1.3,
                 fontFamily: 'Pretendard',
@@ -6577,6 +9117,158 @@ class _TopBarIconButton extends StatelessWidget {
   }
 }
 
+class _ChatReboOnboardingCard extends StatelessWidget {
+  const _ChatReboOnboardingCard({required this.step, required this.onTap});
+
+  final int step;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLastStep = step > 0;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: 24,
+          top: -5,
+          child: Transform.rotate(
+            angle: math.pi / 4,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(Radius.circular(2)),
+              ),
+            ),
+          ),
+        ),
+        Container(
+          width: 332,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: isLastStep
+                    ? const Text(
+                        '일상 대화와 고장 진단을\n여기서 바꿔가며 사용할 수 있어요',
+                        style: TextStyle(
+                          color: Color(0xFF212121),
+                          fontSize: 12,
+                          height: 1.43,
+                          fontWeight: FontWeight.w400,
+                          fontFamily: 'Pretendard',
+                        ),
+                      )
+                    : RichText(
+                        text: const TextSpan(
+                          style: TextStyle(
+                            color: Color(0xFF212121),
+                            fontSize: 12,
+                            height: 1.43,
+                            fontFamily: 'Pretendard',
+                          ),
+                          children: [
+                            TextSpan(
+                              text: 'Chat REBO에서는',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            TextSpan(
+                              text:
+                                  '로\n가전 고장을 빠르게 진단하고\n필요하면 바로 A/S 예약까지 도와드려요',
+                              style: TextStyle(fontWeight: FontWeight.w400),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 16),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    height: 28,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: isLastStep ? null : const Color(0xFF606C80),
+                      gradient: isLastStep
+                          ? const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [Color(0xFFFF937E), Color(0xFFFF5555)],
+                            )
+                          : null,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      isLastStep ? '시작하기' : '확인',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        height: 1.15,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Pretendard',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TopNavigationAssetIconButton extends StatelessWidget {
+  const _TopNavigationAssetIconButton({
+    required this.tooltip,
+    required this.assetPath,
+    required this.onPressed,
+    this.iconSize = 18,
+  });
+
+  final String tooltip;
+  final String assetPath;
+  final VoidCallback onPressed;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      splashRadius: 16,
+      padding: EdgeInsets.zero,
+      constraints: BoxConstraints(minWidth: iconSize, minHeight: iconSize),
+      icon: Image.asset(
+        assetPath,
+        width: iconSize,
+        height: iconSize,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+      ),
+    );
+  }
+}
+
 class _CloseOutlineIcon extends StatelessWidget {
   const _CloseOutlineIcon();
 
@@ -6743,7 +9435,10 @@ class ChatTurn {
     );
   }
 
-  Map<String, String> toJson() => {'user': user, 'assistant': assistant};
+  Map<String, String> toJson() => {
+    'user': user,
+    'assistant': _serializeAssistantForHistory(assistant),
+  };
 
   ChatTurn copyWith({
     String? user,

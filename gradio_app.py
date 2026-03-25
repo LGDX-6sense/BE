@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -149,10 +150,12 @@ def chat_once(
     user_message = build_user_message(user_text, image_path, audio_path)
 
     try:
-        result = run_agent(
-            user_text=conversation_text,
-            image_path=image_path or None,
-            audio_path=audio_path or None,
+        result = asyncio.run(
+            run_agent(
+                user_text=conversation_text,
+                image_path=image_path or None,
+                audio_path=audio_path or None,
+            )
         )
         assistant_message = result["response"]
         evidence = format_evidence(result)
