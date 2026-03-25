@@ -23,6 +23,8 @@ except ImportError:
     tf = None
 
 try:
+    import matplotlib
+    matplotlib.use('Agg')  # non-interactive backend (no GUI/tkinter)
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None

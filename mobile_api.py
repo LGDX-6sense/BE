@@ -22,7 +22,9 @@ except ImportError:
     pass
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from chat_archive_store import (
     ChatSession,
@@ -88,6 +90,8 @@ INTENT_EXAMPLES: Dict[str, List[str]] = {
         "전화 상담 받고 싶어요",
         "사람 상담원과 통화하고 싶어요",
         "직원 연결을 원해요",
+        "상담 서비스 예약하고 싶어요",
+        "상담 서비스 신청할게요",
     ],
     "book_visit": [
         "출장 서비스 예약하고 싶어요",
@@ -119,12 +123,19 @@ INTENT_KEYWORD_HINTS: Dict[str, List[str]] = {
     "connect_agent": [
         "상담",
         "상담원",
+        "상담사",
         "고객센터",
         "전화",
         "통화",
         "사람이랑",
         "직원",
         "연결",
+        "직원 연결",
+        "상담원 연결",
+        "상담사 연결",
+        "고객센터 연결",
+        "상담 서비스",
+        "상담 서비스 예약",
     ],
     "book_visit": [
         "출장",
@@ -135,6 +146,9 @@ INTENT_KEYWORD_HINTS: Dict[str, List[str]] = {
         "방문 예약",
         "출장 예약",
         "출장 서비스",
+        "출장 서비스 예약",
+        "방문 수리",
+        "출장 접수",
         "접수",
     ],
 }
@@ -145,6 +159,23 @@ app = FastAPI(
     description="모바일 앱에서 쓰는 멀티모달 진단 API입니다.",
     version="1.0.0",
 )
+
+import logging as _logging
+
+_logger = _logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def _log_model_config() -> None:
+    agent_model = os.getenv("OPENAI_AGENT_MODEL", "gpt-4.1-mini(기본값)")
+    vision_model = os.getenv("OPENAI_VISION_MODEL", "gpt-4.1-mini(기본값)")
+    tts_model = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts(기본값)")
+    tts_voice = os.getenv("OPENAI_TTS_VOICE", "nova(기본값)")
+    _logger.warning("=== 모델 설정 ===")
+    _logger.warning("  AGENT  : %s", agent_model)
+    _logger.warning("  VISION : %s", vision_model)
+    _logger.warning("  TTS    : %s  voice=%s", tts_model, tts_voice)
+    _logger.warning("=================")
 
 app.add_middleware(
     CORSMiddleware,
@@ -187,9 +218,56 @@ def parse_history(history_json: str) -> List[Dict[str, str]]:
     return history
 
 
+_CONTINUATION_REQUEST_PATTERNS = (
+    "더 자세히",
+    "자세히 설명",
+    "조금 더 자세히",
+    "다시 설명",
+    "다시 알려",
+    "다시 말",
+    "한 번 더 설명",
+    "한번 더 설명",
+    "쉽게 설명",
+    "풀어서 설명",
+    "무슨 뜻",
+    "왜 그런",
+    "이게 왜",
+    "조금 더 알려",
+    "정리해줘",
+    "요약해줘",
+)
+
+_ASSISTANT_PLACEHOLDER_MESSAGES = {
+    "__AS_ROUTING__",
+    "__SELF_CHECK__",
+    "__SERVICE_CONSULT__",
+    "__VISIT_SERVICE__",
+}
+
+
+def _is_continuation_request(message: str) -> bool:
+    normalized = normalize_whitespace(message).lower()
+    if not normalized:
+        return False
+    return any(pattern in normalized for pattern in _CONTINUATION_REQUEST_PATTERNS)
+
+
+def _get_last_real_turn(history: List[Dict[str, str]]) -> Optional[Dict[str, str]]:
+    for turn in reversed(history):
+        if not isinstance(turn, dict):
+            continue
+        assistant_text = normalize_whitespace(str(turn.get("assistant", "")))
+        if assistant_text and assistant_text not in _ASSISTANT_PLACEHOLDER_MESSAGES:
+            return {
+                "user": normalize_whitespace(str(turn.get("user", ""))),
+                "assistant": assistant_text,
+            }
+    return None
+
+
 def build_conversation_context(history: List[Dict[str, str]], current_text: str) -> str:
     """Compress recent turns into a prompt-friendly context string."""
-    recent_turns = history[-4:]
+    recent_turns = history[-6:]
     lines: List[str] = []
     for turn in recent_turns:
         user_text = turn.get("user", "").strip()
@@ -198,6 +276,18 @@ def build_conversation_context(history: List[Dict[str, str]], current_text: str)
             lines.append(f"User: {user_text}")
         if assistant_text:
             lines.append(f"Assistant: {assistant_text}")
+    if _is_continuation_request(current_text):
+        last_turn = _get_last_real_turn(history)
+        if last_turn:
+            lines.append(
+                "Continuation hint: the latest user message is asking for a deeper or repeated explanation of the immediately previous assistant answer."
+            )
+            if last_turn["user"]:
+                lines.append(f"Original issue being discussed: {last_turn['user']}")
+            lines.append(f"Assistant answer to continue from: {last_turn['assistant']}")
+            lines.append(
+                "Instruction: continue from that answer first. Reuse the previously discussed symptom, product, and context. Do not ask for the model name or repeat missing-info questions again unless that information is truly absent from the conversation."
+            )
     if current_text.strip():
         lines.append(f"Current user message: {current_text.strip()}")
     return "\n".join(lines)
@@ -230,6 +320,19 @@ def merge_user_message_text(message: str, voice_transcript: str) -> str:
     """Combine typed text and spoken transcript into one prompt-friendly message."""
     parts = [message.strip(), voice_transcript.strip()]
     return "\n".join(part for part in parts if part)
+
+
+def build_routing_assistant_message(routing_intent: str, diagnosis_text: str = "") -> str:
+    """Return a visible assistant message that also triggers the routing UI."""
+    marker = {
+        "as_request": "__AS_ROUTING__",
+        "connect_agent": "__SERVICE_CONSULT__",
+        "book_visit": "__VISIT_SERVICE__",
+    }.get(routing_intent, "__AS_ROUTING__")
+    cleaned_diagnosis = diagnosis_text.strip()
+    if cleaned_diagnosis:
+        return f"{cleaned_diagnosis}\n{marker}"
+    return marker
 
 
 async def save_upload(upload: Optional[UploadFile]) -> Optional[Path]:
@@ -374,6 +477,103 @@ def load_intent_centroids(
     }
 
 
+_SIMPLE_CHITCHAT_PATTERNS = [
+    "안녕",
+    "하이",
+    "헬로",
+    "hello",
+    "반가워",
+    "반갑습니다",
+    "고마워",
+    "고맙습니다",
+    "감사합니다",
+    "감사해",
+    "감사",
+    "날씨",
+    "기온",
+    "잘 있어",
+    "어떻게 지내",
+    "뭐해",
+    "수고",
+    "bye",
+    "바이",
+    "잘가",
+    "ㅎㅎ",
+    "ㅋㅋ",
+    "올려줄게",
+    "올릴게",
+    "보낼게",
+    "보내줄게",
+    "첨부할게",
+    "찍을게",
+    "찍어줄게",
+    "올려드릴게",
+    "보내드릴게",
+    "올려볼게",
+    "네",
+    "응",
+    "예",
+    "맞아",
+    "맞습니다",
+    "그래",
+    "그렇구나",
+    "그렇군요",
+    "알겠어",
+    "알겠습니다",
+    "이해했어",
+    "알아",
+    "아니요",
+    "아니",
+    "괜찮아",
+    "필요없어",
+    "잠깐만",
+    "잠시만",
+    "기다려",
+    "잠시 후",
+    "됐어",
+    "완료",
+    "끝났어",
+]
+
+
+def _is_simple_chitchat(message: str) -> bool:
+    """이미지/오디오 없는 단순 인사·잡담·업로드예고 여부 판별."""
+    msg = message.strip().lower()
+    if len(msg) > 40:
+        return False
+    return any(pattern in msg for pattern in _SIMPLE_CHITCHAT_PATTERNS)
+
+
+def _fast_chat_response(message: str, user_name: str, history: List[Dict[str, str]]) -> str:
+    """에이전트 루프 없이 LLM 직접 호출 — 단순 질문용."""
+    ensure_openai_client()
+    client = OpenAI()
+    display_name = user_name.strip() or "고객"
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"당신은 LG전자 가전제품 AS 전문 AI 에이전트 레보(Rebo)입니다. "
+                f"고객 이름: {display_name}. "
+                "짧고 친근하게 답변하세요. 가전제품 관련 질문이 아니면 자연스럽게 대화하세요."
+            ),
+        }
+    ]
+    for turn in history[-4:]:
+        if turn.get("user"):
+            messages.append({"role": "user", "content": turn["user"]})
+        if turn.get("assistant"):
+            messages.append({"role": "assistant", "content": turn["assistant"]})
+    messages.append({"role": "user", "content": message})
+
+    resp = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=messages,
+        max_tokens=200,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
 def classify_service_intent(message: str) -> Dict[str, Any]:
     """Classify whether the user is asking for human support or a visit."""
     normalized_message = normalize_whitespace(message).lower()
@@ -436,10 +636,10 @@ def classify_service_intent(message: str) -> Dict[str, Any]:
 
     routing_required = False
     matched_by = "none"
-    if keyword_hit_strength >= 0.16:
+    if keyword_hit_strength >= 0.20:
         routing_required = True
         matched_by = "keyword"
-    elif best_service_score >= 0.34 and best_service_score > normal_score + 0.01:
+    elif best_service_score >= 0.40 and best_service_score > normal_score + 0.03:
         routing_required = True
         matched_by = "vector" if used_vector else "keyword"
 
@@ -497,6 +697,46 @@ def transcribe_voice_message(audio_path: Path) -> str:
     raise RuntimeError("The speech transcription response was empty.")
 
 
+DEFAULT_TTS_MODEL = os.getenv("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
+DEFAULT_TTS_VOICE = os.getenv("OPENAI_TTS_VOICE", "nova")
+
+
+class TtsRequest(BaseModel):
+    text: str
+
+
+@app.post("/api/tts")
+async def text_to_speech(body: TtsRequest) -> StreamingResponse:
+    """Convert assistant text to speech using OpenAI TTS."""
+    ensure_openai_client()
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="text가 비어있습니다.")
+
+    try:
+        client = OpenAI()
+        response = client.audio.speech.create(
+            model=DEFAULT_TTS_MODEL,
+            voice=DEFAULT_TTS_VOICE,
+            input=body.text.strip(),
+            response_format="mp3",
+            speed=1.1,
+            instructions=(
+                "You are a cheerful, bright Korean child around 8 years old. "
+                "Speak in an energetic, cute, and friendly tone. "
+                "Your voice should sound young, light, and enthusiastic."
+            ),
+        )
+        audio_bytes = response.content
+        return StreamingResponse(
+            iter([audio_bytes]),
+            media_type="audio/mpeg",
+            headers={"Content-Length": str(len(audio_bytes))},
+        )
+    except Exception as error:
+        _logger.error("TTS 변환 실패: %s", error)
+        raise HTTPException(status_code=500, detail=f"TTS 변환 실패: {error}") from error
+
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
     """Basic readiness check for emulators, simulators, and local devices."""
@@ -551,7 +791,10 @@ async def chat(
         voice_transcription_warning = ""
         if voice_audio_path is not None:
             try:
-                voice_transcript = transcribe_voice_message(voice_audio_path)
+                voice_transcript = await asyncio.to_thread(
+                    transcribe_voice_message,
+                    voice_audio_path,
+                )
             except Exception as error:
                 voice_transcription_warning = f"음성 전사에 실패했습니다: {error}"
 
@@ -569,18 +812,93 @@ async def chat(
             voice_transcript=voice_transcript,
             voice_filename=voice_audio.filename if voice_audio else None,
         )
-        intent_result = classify_service_intent(effective_message)
+
+        if image is None and audio is None and _is_simple_chitchat(effective_message):
+            fast_reply = await asyncio.to_thread(
+                _fast_chat_response,
+                effective_message,
+                user_name,
+                history,
+            )
+            updated_history = history + [{"user": user_message, "assistant": fast_reply}]
+            saved_session_id, archive_warning = await asyncio.to_thread(
+                _archive_chat,
+                session_id=session_id,
+                user_id=user_id,
+                product_id=product_id,
+                user_message=user_message,
+                assistant_message=fast_reply,
+                history=updated_history,
+                routing_intent="normal_chat",
+                routing_required=False,
+                image=None,
+                audio=None,
+                voice_audio=voice_audio,
+            )
+            return {
+                "assistant_message": fast_reply,
+                "assistant_images": [],
+                "evidence": {},
+                "history": updated_history,
+                "session_id": saved_session_id,
+                "archive_warning": archive_warning,
+                "voice_transcript": voice_transcript,
+                "voice_transcription_warning": voice_transcription_warning,
+                "routing_required": False,
+                "routing_intent": "normal_chat",
+                "routing_action_hint": None,
+                "routing_confidence": 1.0,
+                "routing_matched_by": "fast_path",
+                "agent_steps": [],
+                "severity_level": None,
+                "action_pattern": None,
+                "confidence": None,
+                "judgment_steps": {},
+            }
+
+        def _fetch_profile() -> Optional[UserProfile]:
+            try:
+                db = get_session_factory()()
+                try:
+                    return get_user_profile(db, user_id)
+                finally:
+                    db.close()
+            except Exception as error:
+                _logger.warning("유저 프로필 조회 실패: %s", error)
+                return None
+
+        intent_result, profile = await asyncio.gather(
+            asyncio.to_thread(classify_service_intent, effective_message),
+            asyncio.to_thread(_fetch_profile),
+        )
         if intent_result["routing_required"]:
-            updated_history = history + [{"user": user_message, "assistant": ""}]
-            saved_session_id, archive_warning = _archive_chat(
-                session_id=session_id, user_id=user_id, product_id=product_id,
-                user_message=user_message, assistant_message="",
-                history=updated_history, routing_intent=intent_result["intent"],
-                routing_required=True, image=image, audio=audio, voice_audio=voice_audio,
+            routing_assistant = build_routing_assistant_message(intent_result["intent"])
+            updated_history = history + [{"user": user_message, "assistant": routing_assistant}]
+            saved_session_id, archive_warning = await asyncio.to_thread(
+                _archive_chat,
+                session_id=session_id,
+                user_id=user_id,
+                product_id=product_id,
+                user_message=user_message,
+                assistant_message=routing_assistant,
+                history=updated_history,
+                routing_intent=intent_result["intent"],
+                routing_required=True,
+                image=image,
+                audio=audio,
+                voice_audio=voice_audio,
+                ai_meta={
+                    "user_name": user_name,
+                    "routing_confidence": intent_result["confidence"],
+                    "routing_matched_by": intent_result["matched_by"],
+                } if user_name.strip() else {
+                    "routing_confidence": intent_result["confidence"],
+                    "routing_matched_by": intent_result["matched_by"],
+                },
             )
 
             return {
-                "assistant_message": "",
+                "assistant_message": routing_assistant,
                 "evidence": {},
                 "history": updated_history,
                 "session_id": saved_session_id,
@@ -594,27 +912,18 @@ async def chat(
                 "routing_matched_by": intent_result["matched_by"],
             }
 
-        # 유저 프로필 조회 → agent context 주입
         user_profile_context = ""
         resolved_user_name = user_name
         resolved_device_hint = "unknown"
-        try:
-            db = get_session_factory()()
-            try:
-                profile = get_user_profile(db, user_id)
-                if profile:
-                    resolved_user_name = profile.name
-                    user_profile_context = get_user_context_string(profile)
-                    devices = profile.devices or []
-                    if devices:
-                        resolved_device_hint = devices[0].get("category", "unknown")
-            finally:
-                db.close()
-        except Exception as _e:
-            logger.warning("유저 프로필 조회 실패: %s", _e)
+        if profile:
+            resolved_user_name = profile.name
+            user_profile_context = get_user_context_string(profile)
+            devices = profile.devices or []
+            if devices:
+                resolved_device_hint = devices[0].get("category", "unknown")
 
         conversation_text = build_conversation_context(history, effective_message)
-        result = run_agent(
+        result = await run_agent(
             user_text=conversation_text,
             image_path=str(image_path) if image_path else None,
             audio_path=str(audio_path) if audio_path else None,
@@ -666,16 +975,36 @@ async def chat(
         }
         if triggered_action in _action_to_intent:
             routing_intent = _action_to_intent[triggered_action]
-            updated_history = history + [{"user": user_message, "assistant": ""}]
-            saved_session_id, archive_warning = _archive_chat(
-                session_id=session_id, user_id=user_id, product_id=product_id,
-                user_message=user_message, assistant_message="",
-                history=updated_history, routing_intent=routing_intent,
-                routing_required=True, image=image, audio=audio, voice_audio=voice_audio,
+            diagnosis_text = result.get("response", "").strip()
+            routing_assistant = build_routing_assistant_message(
+                routing_intent,
+                diagnosis_text=diagnosis_text,
+            )
+            updated_history = history + [{"user": user_message, "assistant": diagnosis_text}]
+            saved_session_id, archive_warning = await asyncio.to_thread(
+                _archive_chat,
+                session_id=session_id,
+                user_id=user_id,
+                product_id=product_id,
+                user_message=user_message,
+                assistant_message=diagnosis_text,
+                history=updated_history,
+                routing_intent=routing_intent,
+                routing_required=True,
+                image=image,
+                audio=audio,
+                voice_audio=voice_audio,
+                ai_meta={
+                    "user_name": user_name,
+                    "severity_level": result.get("severity_level"),
+                    "action_pattern": result.get("action_pattern"),
+                    "judgment_steps": result.get("judgment_steps", {}),
+                    "triggered_action": triggered_action,
+                },
             )
 
             return {
-                "assistant_message": "",
+                "assistant_message": routing_assistant,
                 "assistant_images": [],
                 "evidence": result.get("evidence", {}),
                 "history": updated_history,
@@ -691,16 +1020,34 @@ async def chat(
                 "agent_steps": agent_steps,
                 "severity_level": result.get("severity_level"),
                 "action_pattern": result.get("action_pattern"),
+                "confidence": result.get("confidence"),
                 "judgment_steps": result.get("judgment_steps", {}),
             }
 
         updated_history = history + [{"user": user_message, "assistant": result["response"]}]
-        saved_session_id, archive_warning = _archive_chat(
-            session_id=session_id, user_id=user_id, product_id=product_id,
-            user_message=user_message, assistant_message=result["response"],
-            history=updated_history, routing_intent="normal_chat",
-            routing_required=False, image=image, audio=audio, voice_audio=voice_audio,
-            ai_meta={"user_name": user_name} if user_name.strip() else None,
+        saved_session_id, archive_warning = await asyncio.to_thread(
+            _archive_chat,
+            session_id=session_id,
+            user_id=user_id,
+            product_id=product_id,
+            user_message=user_message,
+            assistant_message=result["response"],
+            history=updated_history,
+            routing_intent="normal_chat",
+            routing_required=False,
+            image=image,
+            audio=audio,
+            voice_audio=voice_audio,
+            ai_meta={
+                "user_name": user_name,
+                "severity_level": result.get("severity_level"),
+                "action_pattern": result.get("action_pattern"),
+                "judgment_steps": result.get("judgment_steps", {}),
+            } if user_name.strip() else {
+                "severity_level": result.get("severity_level"),
+                "action_pattern": result.get("action_pattern"),
+                "judgment_steps": result.get("judgment_steps", {}),
+            },
         )
 
         return {
@@ -720,13 +1067,13 @@ async def chat(
             "agent_steps": agent_steps,
             "severity_level": result.get("severity_level"),
             "action_pattern": result.get("action_pattern"),
+            "confidence": result.get("confidence"),
             "judgment_steps": result.get("judgment_steps", {}),
         }
     except HTTPException:
         raise
     except Exception as error:
-        import logging as _logging
-        _logging.getLogger(__name__).error("chat API 오류: %s", error, exc_info=True)
+        _logger.error("chat API 오류: %s", error, exc_info=True)
         raise HTTPException(status_code=500, detail="일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.") from error
     finally:
         cleanup_temp_files(temp_paths)
@@ -745,6 +1092,24 @@ def archive_sessions(
             return {"sessions": [serialize_session(session) for session in sessions]}
         finally:
             db.close()
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/users/{user_id}")
+def user_profile_detail(user_id: int) -> Dict[str, Any]:
+    """Return one user's profile for client-side prefills."""
+    try:
+        db = get_session_factory()()
+        try:
+            profile = get_user_profile(db, user_id)
+            if profile is None:
+                raise HTTPException(status_code=404, detail="User not found.")
+            return {"user": serialize_user(profile)}
+        finally:
+            db.close()
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 

@@ -1038,6 +1038,8 @@ def build_mode_specific_instructions(mode: str, opening_line: str) -> str:
         "Do not use English section headings. "
         "Do not mention ThinQ app, this app, or '앱을 통해' style wording unless the user explicitly asks about the app itself. "
         "If warnings indicate a missing modality result, briefly mention that limitation in simple Korean. "
+        "If the latest user message is asking for a deeper explanation, a simpler explanation, a repeated explanation, or the meaning of the immediately previous answer, treat it as a continuation of that previous answer. "
+        "In that case, continue from the previous answer first and do not ask again for model name or product details unless they are truly missing from the recent conversation. "
     )
     if mode == "diagnosis":
         return (
@@ -1169,7 +1171,7 @@ def generate_agent_response(bundle: AgentEvidenceBundle) -> str:
     )
 
 
-def run_agent(
+async def run_agent(
     user_text: str = "",
     image_path: Optional[str] = None,
     audio_path: Optional[str] = None,
@@ -1180,21 +1182,36 @@ def run_agent(
     user_profile_context: str = "",
 ) -> Dict[str, Any]:
     """Run the full multimodal agent pipeline and return structured output."""
+    import asyncio as _asyncio
+
     warnings: List[str] = []
-    audio_evidence = None
-    image_evidence = None
 
-    if audio_path:
-        try:
-            audio_evidence = build_audio_evidence(audio_path)
-        except Exception as error:
-            warnings.append(f"Audio analysis unavailable: {error}")
+    async def _build_audio() -> tuple[Optional[AudioEvidence], str]:
+        if audio_path:
+            try:
+                evidence = await _asyncio.to_thread(build_audio_evidence, audio_path)
+                return evidence, ""
+            except Exception as error:
+                return None, str(error)
+        return None, ""
 
-    if image_path:
-        try:
-            image_evidence = analyze_image(image_path, user_text=user_text)
-        except Exception as error:
-            warnings.append(f"Image analysis unavailable: {error}")
+    async def _build_image() -> tuple[Optional[ImageEvidence], str]:
+        if image_path:
+            try:
+                evidence = await _asyncio.to_thread(analyze_image, image_path, user_text)
+                return evidence, ""
+            except Exception as error:
+                return None, str(error)
+        return None, ""
+
+    (audio_evidence, audio_error), (image_evidence, image_error) = await _asyncio.gather(
+        _build_audio(),
+        _build_image(),
+    )
+    if audio_error:
+        warnings.append(f"Audio analysis unavailable: {audio_error}")
+    if image_error:
+        warnings.append(f"Image analysis unavailable: {image_error}")
 
     inferred_hint = infer_device_hint(user_text, audio_evidence, image_evidence)
     # 유저 프로필에서 넘어온 device_hint가 있으면 우선 사용
@@ -1212,7 +1229,8 @@ def run_agent(
     # ── AI 에이전트 루프 (ReAct) ──────────────────────────────────────────────
     try:
         from agent_loop import run_agent_loop
-        loop_result = run_agent_loop(
+
+        loop_result = await run_agent_loop(
             user_text=user_text,
             user_name=user_name,
             device_hint=bundle.device_hint,
@@ -1238,6 +1256,7 @@ def run_agent(
             "triggered_reason": loop_result.triggered_reason,
             "severity_level": loop_result.severity_level,
             "action_pattern": loop_result.action_pattern,
+            "confidence": loop_result.confidence,
             "judgment_steps": loop_result.judgment_steps,
             "image_paths": loop_result.image_paths,
             "agent_steps": [
@@ -1248,31 +1267,41 @@ def run_agent(
     except Exception as _e:
         logger.error("agent_loop 실패, 레거시 파이프라인으로 폴백: %s", _e, exc_info=True)
 
-    # ── 레거시 파이프라인 (폴백) ──────────────────────────────────────────────
-    pinecone_api_key = os.getenv("PINECONE_API_KEY", "")
-    pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "lg-support")
-    if pinecone_api_key:
-        try:
-            pinecone_results = pinecone_retrieve(bundle, pinecone_api_key=pinecone_api_key, index_name=pinecone_index_name, top_k=top_k)
-            if pinecone_results:
-                bundle.retrieved_contexts = pinecone_results
-            else:
-                bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
-        except Exception as _e:
-            logger.warning("레거시 Pinecone retrieve 실패, Supabase 폴백: %s", _e)
-            bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
-    else:
-        vector_store_id = vector_store_id or os.getenv("OPENAI_VECTOR_STORE_ID")
-        if vector_store_id:
+    def _run_legacy() -> str:
+        pinecone_api_key = os.getenv("PINECONE_API_KEY", "")
+        pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "lg-support")
+        if pinecone_api_key:
             try:
-                bundle.retrieved_contexts = vector_store_retrieve(bundle, vector_store_id=vector_store_id, top_k=top_k)
+                pinecone_results = pinecone_retrieve(
+                    bundle,
+                    pinecone_api_key=pinecone_api_key,
+                    index_name=pinecone_index_name,
+                    top_k=top_k,
+                )
+                if pinecone_results:
+                    bundle.retrieved_contexts = pinecone_results
+                else:
+                    bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
             except Exception as _e:
-                logger.warning("vector_store_retrieve 실패, Supabase 폴백: %s", _e)
+                logger.warning("레거시 Pinecone retrieve 실패, Supabase 폴백: %s", _e)
                 bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
         else:
-            bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
+            current_vector_store_id = vector_store_id or os.getenv("OPENAI_VECTOR_STORE_ID")
+            if current_vector_store_id:
+                try:
+                    bundle.retrieved_contexts = vector_store_retrieve(
+                        bundle,
+                        vector_store_id=current_vector_store_id,
+                        top_k=top_k,
+                    )
+                except Exception as _e:
+                    logger.warning("vector_store_retrieve 실패, Supabase 폴백: %s", _e)
+                    bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
+            else:
+                bundle.retrieved_contexts = _supabase_or_local_retrieve(bundle, top_k=top_k)
+        return generate_agent_response(bundle)
 
-    response_text = generate_agent_response(bundle)
+    response_text = await _asyncio.to_thread(_run_legacy)
 
     return {
         "evidence": build_evidence_payload(bundle),
@@ -1296,12 +1325,16 @@ def main() -> None:
     parser.add_argument("--vector-store-id", default="", help="Optional OpenAI vector store id")
     args = parser.parse_args()
 
-    result = run_agent(
-        user_text=args.text,
-        image_path=args.image or None,
-        audio_path=args.audio or None,
-        top_k=args.top_k,
-        vector_store_id=args.vector_store_id or None,
+    import asyncio
+
+    result = asyncio.run(
+        run_agent(
+            user_text=args.text,
+            image_path=args.image or None,
+            audio_path=args.audio or None,
+            top_k=args.top_k,
+            vector_store_id=args.vector_store_id or None,
+        )
     )
 
     print("=== Multimodal Agent Response ===")
