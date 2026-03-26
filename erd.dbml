@@ -1,0 +1,123 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table users {
+  id integer [primary key]
+  name varchar
+  phone varchar
+  created_at timestamp
+}
+
+Table user_products {
+  id integer [primary key]
+  user_id integer [not null]
+  category varchar [note: '냉장고, 세탁기 등']
+  model_name varchar
+  is_registered boolean [note: '앱 등록 기기 여부 (등록/미등록 구분)']
+}
+
+Table as_requests {
+  id integer [primary key]
+  user_product_id integer [not null, unique, note: '제품 1개당 요청 1개']
+  status varchar [note: '진단중, 가이드제공, 해결됨, 예약됨']
+  created_at timestamp
+}
+
+Table symptoms {
+  id integer [primary key]
+  as_request_id integer [not null]
+  type varchar [note: 'TEXT, IMAGE, VOICE']
+  content text [note: '텍스트 내용 또는 사진/녹음 URL']
+  created_at timestamp
+}
+
+Table ai_diagnoses {
+  id integer [primary key]
+  as_request_id integer [not null, unique, note: '요청당 AI 진단 0 또는 1건']
+  symptom_type varchar [note: 'Step 1: 분류된 증상']
+  inferred_cause varchar [note: 'Step 2: 추론된 원인']
+  severity varchar [note: 'Step 3: SELF, EXPERT, MORE_INFO']
+  summary text [note: '상담사 전달용 AI 요약본']
+}
+
+Table diagnosis_logs {
+  id integer [primary key]
+  diagnosis_id integer [not null]
+  question text [note: '추가 정보 필요 시 AI 질문']
+  answer text [note: '사용자 답변']
+  created_at timestamp
+}
+
+Table guides {
+  id integer [primary key]
+  category varchar [note: '제품 카테고리']
+  title varchar [note: '자가해결 가이드 제목']
+  content_url text [note: '가이드 상세 내용 및 영상 링크']
+}
+
+Table reservations {
+  id integer [primary key]
+  as_request_id integer [not null, unique, note: '요청당 예약 0 또는 1개']
+  type varchar [note: 'CALL(전화상담), VISIT(출장수리)']
+  schedule_date timestamp
+  agent_info varchar [note: '배정된 상담사 또는 기사 정보']
+  created_at timestamp
+}
+
+Table reviews {
+  id integer [primary key]
+  as_request_id integer [not null, unique, note: '요청당 리뷰 0 또는 1개']
+  is_solved boolean [note: '자가해결 성공 여부']
+  score integer [note: '만족도 별점 (1~5)']
+  created_at timestamp
+}
+
+// Relationships
+Ref: user_products.user_id > users.id
+Ref: as_requests.user_product_id - user_products.id
+Ref: symptoms.as_request_id > as_requests.id
+Ref: ai_diagnoses.as_request_id - as_requests.id
+Ref: diagnosis_logs.diagnosis_id - ai_diagnoses.id
+Ref: reservations.as_request_id - as_requests.id
+Ref: reviews.as_request_id - as_requests.id
+
+// --- Dummy Data (Records) ---
+
+Records users(id, name, phone) {
+  1, '김씽큐', '010-1234-5678'
+  2, '이엘지', '010-8765-4321'
+}
+
+Records user_products(id, user_id, category, model_name, is_registered) {
+  1, 1, '냉장고', 'M873', true
+}
+
+Records as_requests(id, user_product_id, status) {
+  1, 1, '예약됨'
+}
+
+Records symptoms(id, as_request_id, type, content) {
+  1, 1, 'TEXT', '냉장고에서 이상한 소리가 나요'
+  2, 1, 'VOICE', 'https://storage.thinq.com/audio/noise_123.mp3'
+  3, 1, 'IMAGE', 'https://storage.thinq.com/image/error_OE.jpg'
+}
+
+Records ai_diagnoses(id, as_request_id, symptom_type, inferred_cause, severity, summary) {
+  1, 1, '소음/진동', '컴프레서 또는 팬 모터 이상', 'EXPERT', '냉장고 하단 소음 발생. 팬 모터 점검 및 부품 교체 필요 예상.'
+}
+
+Records diagnosis_logs(id, diagnosis_id, question, answer) {
+  1, 1, '소리가 언제부터 나기 시작했나요?', '어제 밤부터 갑자기 나기 시작했어요.'
+}
+
+Records guides(id, category, title, content_url) {
+  1, '냉장고', '냉장고 소음 해결 가이드', 'https://thinq.com/guide/refrigerator_noise'
+}
+
+Records reservations(id, as_request_id, type, schedule_date, agent_info) {
+  1, 1, 'VISIT', '2026-03-20 14:00:00', '홍길동 엔지니어'
+}
+
+Records reviews(id, as_request_id, is_solved, score) {
+  1, 1, true, 5
+}

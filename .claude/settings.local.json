@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from PIL import Image; print\\(''PIL OK''\\)\")",
+      "Bash(xargs grep:*)",
+      "Bash(ipconfig)",
+      "Bash(ls c:/Users/4151/Downloads/dx_backup_20260313_143719/*centroid*)",
+      "Bash(ls c:/Users/4151/Downloads/dx_backup_20260313_143719/*.npy)",
+      "Bash(tasklist)",
+      "Bash(taskkill /F /IM dart.exe /T)",
+      "Bash(taskkill /F /IM dartvm.exe /T)",
+      "Bash(taskkill /F /IM java.exe /T)",
+      "Bash(cmd /c \"taskkill /F /IM dart.exe /T & taskkill /F /IM dartvm.exe /T & taskkill /F /IM java.exe /T\")",
+      "Bash(cmd /c \"rd /s /q \"\"C:\\\\Users\\\\4151\\\\BE\\\\mobile_app\\\\build\"\" 2>&1 && echo 삭제완료 || echo 삭제실패\")",
+      "Bash(cmd /c \"powershell -Command \"\"Get-MpPreference | Select-Object -ExpandProperty ExclusionPath\"\"\")",
+      "Bash(cmd /c \"net stop WSearch 2>&1\")",
+      "Bash(cmd /c \"rd /s /q \"\"C:\\\\Users\\\\4151\\\\BE\\\\mobile_app\\\\build\\\\app\\\\intermediates\\\\flutter\\\\debug\"\" 2>&1 && echo 삭제완료 || echo 삭제실패\")"
+    ]
+  }
+}

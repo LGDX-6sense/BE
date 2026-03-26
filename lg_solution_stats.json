@@ -1,0 +1,10 @@
+{
+  "total_documents": 6408,
+  "supported_documents": 2490,
+  "device_counts": {
+    "air_conditioner": 1013,
+    "other": 3918,
+    "refrigerator": 886,
+    "washing_machine": 591
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/.dart_tool/**": true
+  },
+  "files.exclude": {
+    "**/build": true,
+    "**/.dart_tool": true
+  }
+}

@@ -1,0 +1,97 @@
+INFO:     127.0.0.1:59268 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59270 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44178 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44182 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44214 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44216 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44218 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44220 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44552 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44562 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44564 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44626 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44636 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44638 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44688 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44692 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44694 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44716 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44718 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44724 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44732 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44734 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44736 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44740 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44756 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44758 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44760 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44790 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44792 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44794 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44804 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44806 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44808 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44816 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44818 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44820 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44828 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44878 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44884 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44886 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44888 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44890 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44892 - "GET /api/archive/sessions/138 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44902 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44968 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44970 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44972 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:44974 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44976 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44978 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44980 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44990 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:44994 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65324 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45016 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45018 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45020 - "GET /api/archive/sessions/141 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45022 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45024 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45026 - "GET /api/archive/sessions/141 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45028 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45030 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45032 - "GET /api/archive/sessions/142 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45034 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45036 - "GET /api/archive/sessions/141 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45038 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45042 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45044 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45046 - "GET /api/archive/sessions/85 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45060 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45068 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45076 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45078 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45082 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45084 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45086 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45088 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45090 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45092 - "GET /api/archive/sessions/85 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45094 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45096 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45100 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45108 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45110 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45114 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45116 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45118 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45120 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45122 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45124 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45132 - "GET /api/archive/sessions?user_id=3&limit=50 HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45134 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45136 - "GET /api/users/3 HTTP/1.1" 404 Not Found
+INFO:     192.168.0.183:45168 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45170 - "POST /api/chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61002 - "GET /health HTTP/1.1" 200 OK
+INFO:     192.168.0.183:45306 - "GET /health HTTP/1.1" 200 OK

@@ -1,0 +1,17 @@
+numpy
+matplotlib
+librosa
+tensorflow
+openai
+gradio
+fastapi
+uvicorn[standard]
+python-multipart
+sqlalchemy
+pymysql
+cryptography
+pinecone
+supabase
+tqdm
+python-dotenv
+psycopg2-binary
