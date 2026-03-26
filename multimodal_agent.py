@@ -1212,14 +1212,15 @@ def run_agent(
     # ── AI 에이전트 루프 (ReAct) ──────────────────────────────────────────────
     try:
         from agent_loop import run_agent_loop
-        loop_result = run_agent_loop(
+        import asyncio as _asyncio
+        loop_result = _asyncio.run(run_agent_loop(
             user_text=user_text,
             user_name=user_name,
             device_hint=bundle.device_hint,
             image_path=image_path or "",
             audio_path=audio_path or "",
             user_profile_context=user_profile_context,
-        )
+        ))
 
         # 에이전트가 검색한 이미지를 bundle에 반영
         if loop_result.image_paths:

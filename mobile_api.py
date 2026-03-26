@@ -887,7 +887,8 @@ async def chat(
             }
 
         conversation_text = build_conversation_context(history, effective_message)
-        result = await run_agent(
+        result = await asyncio.to_thread(
+            run_agent,
             user_text=conversation_text,
             image_path=str(image_path) if image_path else None,
             audio_path=str(audio_path) if audio_path else None,
@@ -1185,7 +1186,7 @@ def get_user(user_id: int) -> Dict[str, Any]:
             profile = get_user_profile(db, user_id)
             if profile is None:
                 raise HTTPException(status_code=404, detail="User not found.")
-            return serialize_user(profile)
+            return {"user": serialize_user(profile)}
         finally:
             db.close()
     except HTTPException:
