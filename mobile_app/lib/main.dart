@@ -256,6 +256,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   String? _latestEvidence;
   String? _errorMessage;
   int? _chatSessionId;
+  String? _bookingDetailedSymptom;
   bool _isSubmitting = false;
   bool _isCheckingConnection = false;
   bool _serverHealthy = false;
@@ -1407,6 +1408,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           initialUserName: seedProfile?.name ?? _dbUserName,
           initialPhoneNumber: seedProfile?.phone ?? '',
           initialAddress: seedProfile?.address ?? '',
+          initialDetailedSymptom: _bookingDetailedSymptom,
         ),
         fullscreenDialog: true,
       ),
@@ -1448,6 +1450,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           initialUserName: seedProfile?.name ?? _dbUserName,
           initialPhoneNumber: seedProfile?.phone ?? '',
           initialAddress: seedProfile?.address ?? '',
+          initialDetailedSymptom: _bookingDetailedSymptom,
         ),
         fullscreenDialog: true,
       ),
@@ -1748,6 +1751,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _messageController.clear();
         _serverHealthy = true;
         _serverStatus = '연결됨';
+        final rawBookingPrefill = decoded['booking_prefill'];
+        if (rawBookingPrefill is Map) {
+          final sym = rawBookingPrefill['detailed_symptom']?.toString();
+          if (sym != null && sym.isNotEmpty) _bookingDetailedSymptom = sym;
+        }
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3076,11 +3084,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
       body: ChatThinQWelcomeScreen(
         onCloseTap: _openSettings,
         onMoreTap: _openSettings,
-        onComposerTap: _openChatHome,
         onReboTap: _openChatHome,
         onSuggestionTap: _openChatHomeWithPrefill,
         showOnboarding: _showChatThinQOnboarding,
         onDismissOnboarding: _advanceToChatReboOnboarding,
+        baseUrl: _baseUrl,
       ),
       bottomNavigationBar: widget.hideBottomNav
           ? null
