@@ -2,18 +2,20 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:universal_io/io.dart';
 
 import 'screens/home_screen.dart';
 import 'screens/device_screen.dart';
@@ -249,10 +251,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
   File? _selectedAudio;
   File? _recordedVoice;
   File? _recordedNoise;
+  Uint8List? _selectedImageBytes;
+  Uint8List? _selectedAudioBytes;
+  Uint8List? _recordedVoiceBytes;
+  Uint8List? _recordedNoiseBytes;
   String? _selectedImageName;
   String? _selectedAudioName;
   String? _recordedVoiceName;
   String? _recordedNoiseName;
+  String? _selectedImagePreviewDataUrl;
   String? _latestEvidence;
   String? _errorMessage;
   int? _chatSessionId;
@@ -340,9 +347,11 @@ class _MobileHomePageState extends State<MobileHomePage> {
     _messageController.addListener(_handleComposerChanged);
     _baseUrlController.text = _defaultBaseUrlOverride.isNotEmpty
         ? _defaultBaseUrlOverride
-        : (Platform.isAndroid
-              ? 'http://192.168.0.13:8000'
-              : 'http://127.0.0.1:8000');
+        : (kIsWeb
+              ? ''
+              : (Platform.isAndroid
+                    ? 'http://192.168.0.13:8000'
+                    : 'http://127.0.0.1:8000'));
     unawaited(_configureTts());
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkConnection());
   }
@@ -533,7 +542,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       await _tts.setSpeechRate(0.42);
       await _tts.setPitch(1.0);
       await _tts.setVolume(1.0);
-      if (Platform.isIOS) {
+      if (!kIsWeb && Platform.isIOS) {
         await _tts.setSharedInstance(true);
         await _tts.autoStopSharedSession(true);
       }
@@ -629,6 +638,15 @@ class _MobileHomePageState extends State<MobileHomePage> {
       return;
     }
 
+    if (_baseUrl.isEmpty) {
+      setState(() {
+        _serverHealthy = false;
+        _serverStatus = 'URL required';
+        _errorMessage = 'DEFAULT_BASE_URL is not configured.';
+      });
+      return;
+    }
+
     setState(() {
       _isCheckingConnection = true;
       _serverStatus = '확인 중';
@@ -681,8 +699,14 @@ class _MobileHomePageState extends State<MobileHomePage> {
       return;
     }
 
+    final imageBytes = kIsWeb ? await file.readAsBytes() : null;
+
     setState(() {
-      _selectedImage = File(file.path);
+      _selectedImage = File(file.path.isEmpty ? file.name : file.path);
+      _selectedImageBytes = imageBytes;
+      _selectedImagePreviewDataUrl = imageBytes == null
+          ? null
+          : _buildImageDataUrl(imageBytes, file.name);
       _selectedImageName = file.name;
       _errorMessage = null;
     });
@@ -709,14 +733,17 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
 
     final picked = result.files.single;
+    final pickedBytes = picked.bytes;
     File? selectedFile;
-    if (picked.path != null) {
+    if (picked.path != null && picked.path!.isNotEmpty) {
       selectedFile = File(picked.path!);
-    } else if (picked.bytes != null) {
+    } else if (!kIsWeb && pickedBytes != null) {
       final tempDir = await getTemporaryDirectory();
       final tempFile = File('${tempDir.path}/${picked.name}');
-      await tempFile.writeAsBytes(picked.bytes!);
+      await tempFile.writeAsBytes(pickedBytes);
       selectedFile = tempFile;
+    } else if (picked.name.isNotEmpty) {
+      selectedFile = File(picked.name);
     }
 
     if (selectedFile == null) {
@@ -730,6 +757,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_supportedImageExtensions.contains(extension)) {
       setState(() {
         _selectedImage = selectedFile;
+        _selectedImageBytes = kIsWeb ? pickedBytes : null;
+        _selectedImagePreviewDataUrl = kIsWeb && pickedBytes != null
+            ? _buildImageDataUrl(pickedBytes, picked.name)
+            : null;
         _selectedImageName = picked.name;
         _errorMessage = null;
       });
@@ -739,6 +770,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     if (_supportedAudioExtensions.contains(extension)) {
       setState(() {
         _selectedAudio = selectedFile;
+        _selectedAudioBytes = kIsWeb ? pickedBytes : null;
         _selectedAudioName = picked.name;
         _errorMessage = null;
       });
@@ -777,21 +809,16 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return;
       }
 
-      final tempDir = await getTemporaryDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final outputPath =
-          '${tempDir.path}${Platform.pathSeparator}recorded_audio_$timestamp.m4a';
-
       await _voiceRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
+        RecordConfig(
+          encoder: kIsWeb ? AudioEncoder.wav : AudioEncoder.aacLc,
           sampleRate: 16000,
           numChannels: 1,
           autoGain: true,
           echoCancel: true,
           noiseSuppress: true,
         ),
-        path: outputPath,
+        path: kIsWeb ? '' : await _buildRecordingPath('recorded_audio', 'm4a'),
       );
 
       if (!mounted) {
@@ -801,6 +828,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _isRecordingVoice = true;
         _recordedVoice = null;
+        _recordedVoiceBytes = null;
         _recordedVoiceName = null;
         _errorMessage = null;
       });
@@ -821,6 +849,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Future<void> _stopVoiceRecording() async {
     try {
       final savedPath = await _voiceRecorder.stop();
+      final recordedBytes = await _readRecordedBytes(savedPath);
       _stopRecordingUiTimer();
       if (!mounted) {
         return;
@@ -828,13 +857,18 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
       setState(() {
         _isRecordingVoice = false;
-        if (savedPath == null || savedPath.isEmpty) {
+        if ((savedPath == null || savedPath.isEmpty) &&
+            (recordedBytes == null || recordedBytes.isEmpty)) {
           _errorMessage = '녹음 파일을 저장하지 못했습니다.';
           return;
         }
 
-        _recordedVoice = File(savedPath);
-        _recordedVoiceName = _basename(savedPath);
+        final fileName = kIsWeb
+            ? 'recorded_voice_${DateTime.now().millisecondsSinceEpoch}.wav'
+            : _basename(savedPath!);
+        _recordedVoice = File(savedPath ?? fileName);
+        _recordedVoiceBytes = recordedBytes;
+        _recordedVoiceName = fileName;
         _errorMessage = null;
       });
     } catch (error) {
@@ -875,11 +909,6 @@ class _MobileHomePageState extends State<MobileHomePage> {
         return;
       }
 
-      final tempDir = await getTemporaryDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final outputPath =
-          '${tempDir.path}${Platform.pathSeparator}noise_recording_$timestamp.wav';
-
       await _voiceRecorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
@@ -889,7 +918,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           echoCancel: false,
           noiseSuppress: false,
         ),
-        path: outputPath,
+        path: kIsWeb ? '' : await _buildRecordingPath('noise_recording', 'wav'),
       );
 
       if (!mounted) return;
@@ -897,6 +926,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       setState(() {
         _isRecordingNoise = true;
         _recordedNoise = null;
+        _recordedNoiseBytes = null;
         _recordedNoiseName = null;
         _errorMessage = null;
       });
@@ -914,17 +944,23 @@ class _MobileHomePageState extends State<MobileHomePage> {
   Future<void> _stopNoiseRecording() async {
     try {
       final savedPath = await _voiceRecorder.stop();
+      final recordedBytes = await _readRecordedBytes(savedPath);
       _stopRecordingUiTimer();
       if (!mounted) return;
 
       setState(() {
         _isRecordingNoise = false;
-        if (savedPath == null || savedPath.isEmpty) {
+        if ((savedPath == null || savedPath.isEmpty) &&
+            (recordedBytes == null || recordedBytes.isEmpty)) {
           _errorMessage = '소음 녹음 파일을 저장하지 못했습니다.';
           return;
         }
-        _recordedNoise = File(savedPath);
-        _recordedNoiseName = _basename(savedPath);
+        final fileName = kIsWeb
+            ? 'noise_recording_${DateTime.now().millisecondsSinceEpoch}.wav'
+            : _basename(savedPath!);
+        _recordedNoise = File(savedPath ?? fileName);
+        _recordedNoiseBytes = recordedBytes;
+        _recordedNoiseName = fileName;
         _errorMessage = null;
       });
     } catch (error) {
@@ -943,13 +979,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
     }
 
     try {
-      final savedPath = await _voiceRecorder.stop();
-      if (savedPath != null && savedPath.isNotEmpty) {
-        final file = File(savedPath);
-        if (await file.exists()) {
-          await file.delete();
-        }
-      }
+      await _voiceRecorder.cancel();
     } catch (_) {}
 
     _stopRecordingUiTimer();
@@ -961,8 +991,10 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _isRecordingVoice = false;
       _isRecordingNoise = false;
       _recordedVoice = null;
+      _recordedVoiceBytes = null;
       _recordedVoiceName = null;
       _recordedNoise = null;
+      _recordedNoiseBytes = null;
       _recordedNoiseName = null;
       _errorMessage = null;
     });
@@ -1202,6 +1234,133 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
   String _basename(String path) => path.split(RegExp(r'[\\/]')).last;
 
+  void _clearPendingAttachments() {
+    _selectedImage = null;
+    _selectedAudio = null;
+    _recordedVoice = null;
+    _recordedNoise = null;
+    _selectedImageBytes = null;
+    _selectedAudioBytes = null;
+    _recordedVoiceBytes = null;
+    _recordedNoiseBytes = null;
+    _selectedImageName = null;
+    _selectedAudioName = null;
+    _recordedVoiceName = null;
+    _recordedNoiseName = null;
+    _selectedImagePreviewDataUrl = null;
+  }
+
+  String _buildImageDataUrl(Uint8List bytes, String? filename) {
+    final extension = (filename ?? '').split('.').last.toLowerCase();
+    final mimeType = switch (extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      'gif' => 'image/gif',
+      'bmp' => 'image/bmp',
+      'heic' => 'image/heic',
+      _ => 'application/octet-stream',
+    };
+    return 'data:$mimeType;base64,${base64Encode(bytes)}';
+  }
+
+  Uint8List? _decodeDataUrl(String path) {
+    if (!path.startsWith('data:')) {
+      return null;
+    }
+
+    final commaIndex = path.indexOf(',');
+    if (commaIndex == -1) {
+      return null;
+    }
+
+    try {
+      return base64Decode(path.substring(commaIndex + 1));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> _buildRecordingPath(String prefix, String extension) async {
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return '${tempDir.path}${Platform.pathSeparator}${prefix}_$timestamp.$extension';
+  }
+
+  Future<Uint8List?> _readRecordedBytes(String? savedPath) async {
+    if (savedPath == null || savedPath.isEmpty) {
+      return null;
+    }
+
+    if (kIsWeb) {
+      final response = await http.get(Uri.parse(savedPath));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw Exception('Failed to read recorded blob: ${response.statusCode}');
+      }
+      return response.bodyBytes;
+    }
+
+    final file = File(savedPath);
+    if (!await file.exists()) {
+      return null;
+    }
+    return file.readAsBytes();
+  }
+
+  Future<void> _appendMultipartFile({
+    required http.MultipartRequest request,
+    required String fieldName,
+    File? file,
+    Uint8List? bytes,
+    String? filename,
+  }) async {
+    if (bytes != null && bytes.isNotEmpty) {
+      request.files.add(
+        http.MultipartFile.fromBytes(fieldName, bytes, filename: filename),
+      );
+      return;
+    }
+
+    if (file == null) {
+      return;
+    }
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        fieldName,
+        file.path,
+        filename: filename,
+      ),
+    );
+  }
+
+  Widget _buildPreviewImage({
+    String? imagePath,
+    Uint8List? imageBytes,
+    BoxFit fit = BoxFit.cover,
+    double? width,
+    double? height,
+  }) {
+    final previewBytes =
+        imageBytes ?? (imagePath == null ? null : _decodeDataUrl(imagePath));
+
+    if (previewBytes != null) {
+      return Image.memory(previewBytes, fit: fit, width: width, height: height);
+    }
+
+    if (imagePath == null || imagePath.isEmpty) {
+      return SizedBox(width: width, height: height);
+    }
+
+    return Image.file(
+      File(imagePath),
+      fit: fit,
+      width: width,
+      height: height,
+      errorBuilder: (_, _, _) => SizedBox(width: width, height: height),
+    );
+  }
+
   String _stripSimpleMarkdown(String text) {
     return text.replaceAllMapped(
       RegExp(r'\*\*(.*?)\*\*', dotAll: true),
@@ -1309,14 +1468,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         ),
       ];
       _serviceRoutingStep = ServiceRoutingStep.askDiagnosis;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
+      _clearPendingAttachments();
       _messageController.clear();
       _errorMessage = null;
     });
@@ -1338,14 +1490,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _serviceRoutingStep = ServiceRoutingStep.none;
       _history = const [];
       _chatSessionId = null;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
+      _clearPendingAttachments();
       _latestEvidence = null;
       _errorMessage = null;
       _messageController.clear();
@@ -1591,7 +1736,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
 
     try {
       final previousHistory = List<ChatTurn>.from(_history);
-      final submittedImagePath = _selectedImage?.path;
+      final submittedImagePath =
+          _selectedImagePreviewDataUrl ?? _selectedImage?.path;
       final submittedImageName = _selectedImageName;
 
       final request =
@@ -1608,42 +1754,42 @@ class _MobileHomePageState extends State<MobileHomePage> {
       }
 
       if (_selectedImage != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'image',
-            _selectedImage!.path,
-            filename: _selectedImageName,
-          ),
+        await _appendMultipartFile(
+          request: request,
+          fieldName: 'image',
+          file: _selectedImage,
+          bytes: _selectedImageBytes,
+          filename: _selectedImageName,
         );
       }
 
       if (_selectedAudio != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'audio',
-            _selectedAudio!.path,
-            filename: _selectedAudioName,
-          ),
+        await _appendMultipartFile(
+          request: request,
+          fieldName: 'audio',
+          file: _selectedAudio,
+          bytes: _selectedAudioBytes,
+          filename: _selectedAudioName,
         );
       }
 
       if (_recordedVoice != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'voice_audio',
-            _recordedVoice!.path,
-            filename: _recordedVoiceName,
-          ),
+        await _appendMultipartFile(
+          request: request,
+          fieldName: 'voice_audio',
+          file: _recordedVoice,
+          bytes: _recordedVoiceBytes,
+          filename: _recordedVoiceName,
         );
       }
 
       if (_recordedNoise != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'audio',
-            _recordedNoise!.path,
-            filename: _recordedNoiseName,
-          ),
+        await _appendMultipartFile(
+          request: request,
+          fieldName: 'audio',
+          file: _recordedNoise,
+          bytes: _recordedNoiseBytes,
+          filename: _recordedNoiseName,
         );
       }
 
@@ -1740,14 +1886,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _latestEvidence = routingRequired
             ? null
             : const JsonEncoder.withIndent('  ').convert(decoded['evidence']);
-        _selectedImage = null;
-        _selectedAudio = null;
-        _recordedVoice = null;
-        _recordedNoise = null;
-        _selectedImageName = null;
-        _selectedAudioName = null;
-        _recordedVoiceName = null;
-        _recordedNoiseName = null;
+        _clearPendingAttachments();
         _messageController.clear();
         _serverHealthy = true;
         _serverStatus = '연결됨';
@@ -1813,14 +1952,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _history = const [];
       _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
+      _clearPendingAttachments();
       _latestEvidence = null;
       _errorMessage = null;
       _messageController.clear();
@@ -1839,14 +1971,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _history = const [];
       _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
+      _clearPendingAttachments();
       _latestEvidence = null;
       _errorMessage = null;
       _messageController.clear();
@@ -1865,14 +1990,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _history = const [];
       _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
+      _clearPendingAttachments();
       _latestEvidence = null;
       _errorMessage = null;
       _messageController
@@ -1898,14 +2016,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
       _history = const [];
       _chatSessionId = null;
       _serviceRoutingStep = ServiceRoutingStep.none;
-      _selectedImage = null;
-      _selectedAudio = null;
-      _recordedVoice = null;
-      _recordedNoise = null;
-      _selectedImageName = null;
-      _selectedAudioName = null;
-      _recordedVoiceName = null;
-      _recordedNoiseName = null;
+      _clearPendingAttachments();
       _latestEvidence = null;
       _errorMessage = null;
       _messageController.clear();
@@ -2278,14 +2389,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
         _archiveOpenedFromChat = false;
         _selectedBottomNavIndex = 2;
         _serviceRoutingStep = ServiceRoutingStep.none;
-        _selectedImage = null;
-        _selectedAudio = null;
-        _recordedVoice = null;
-        _recordedNoise = null;
-        _selectedImageName = null;
-        _selectedAudioName = null;
-        _recordedVoiceName = null;
-        _recordedNoiseName = null;
+        _clearPendingAttachments();
         _latestEvidence = null;
         _errorMessage = null;
         _messageController.clear();
@@ -4099,7 +4203,13 @@ class _MobileHomePageState extends State<MobileHomePage> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                      child: _buildPreviewImage(
+                        imagePath:
+                            _selectedImagePreviewDataUrl ??
+                            _selectedImage?.path,
+                        imageBytes: _selectedImageBytes,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   Positioned(
@@ -4109,7 +4219,9 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       onTap: () {
                         setState(() {
                           _selectedImage = null;
+                          _selectedImageBytes = null;
                           _selectedImageName = null;
+                          _selectedImagePreviewDataUrl = null;
                         });
                       },
                       child: Container(
@@ -4238,6 +4350,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           icon: Icons.audio_file_rounded,
           onDelete: () => setState(() {
             _selectedAudio = null;
+            _selectedAudioBytes = null;
             _selectedAudioName = null;
           }),
         ),
@@ -4251,6 +4364,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           icon: Icons.mic_rounded,
           onDelete: () => setState(() {
             _recordedVoice = null;
+            _recordedVoiceBytes = null;
             _recordedVoiceName = null;
           }),
         ),
@@ -4264,6 +4378,7 @@ class _MobileHomePageState extends State<MobileHomePage> {
           icon: Icons.graphic_eq_rounded,
           onDelete: () => setState(() {
             _recordedNoise = null;
+            _recordedNoiseBytes = null;
             _recordedNoiseName = null;
           }),
         ),
@@ -4724,8 +4839,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                File(imagePath),
+                              child: _buildPreviewImage(
+                                imagePath: imagePath,
                                 fit: BoxFit.cover,
                               ),
                             ),
@@ -6183,8 +6298,8 @@ class _MobileHomePageState extends State<MobileHomePage> {
                       const SizedBox(height: 12),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          File(_history.last.userImagePath!),
+                        child: _buildPreviewImage(
+                          imagePath: _history.last.userImagePath,
                           width: 98,
                           height: 98,
                           fit: BoxFit.cover,
