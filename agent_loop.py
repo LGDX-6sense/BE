@@ -11,6 +11,7 @@ AI Agent Loop — ReAct 패턴 (생각 → 행동 → 관찰 → 생각)
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -21,9 +22,10 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 try:
-    from openai import OpenAI
+    from openai import OpenAI, AsyncOpenAI
 except ImportError:
     OpenAI = None
+    AsyncOpenAI = None
 
 
 # ── 도구 정의 ────────────────────────────────────────────────────────────────
@@ -113,15 +115,16 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
         "function": {
             "name": "initiate_as_booking",
             "description": (
-                "자가점검 후에도 문제가 해결되지 않거나 전문가 수리가 필요한 경우 "
-                "AS 방문 서비스 예약을 시작합니다."
+                "내부 부품 손상, 전기 계통, 냉매 문제 등 전문가 수리가 필요한 경우 "
+                "AS 방문 서비스 예약을 시작합니다. "
+                "자가점검 없이도 명확히 전문가가 필요한 상황이면 즉시 호출하세요."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "reason": {
                         "type": "string",
-                        "description": "AS 예약을 권장하는 이유 (한국어 1-2문장)",
+                        "description": "발견된 증상, 예상 원인, AS가 필요한 이유를 포함한 전체 진단 내용 (한국어)",
                     },
                 },
                 "required": ["reason"],
@@ -171,6 +174,7 @@ class AgentLoopResult:
     image_paths: List[str] = field(default_factory=list)
     severity_level: Optional[int] = None     # 1(자가해결) 2(재확인) 3(전문가) 4(긴급)
     action_pattern: Optional[str] = None     # "A" | "B" | "C" | "D"
+    confidence: Optional[str] = None         # "high" | "medium" | "low"
     judgment_steps: Dict[str, str] = field(default_factory=dict)  # step1/2/3 요약
 
 
@@ -202,11 +206,12 @@ def _execute_analyze_image(image_path: str, user_text: str = "") -> str:
     try:
         from multimodal_agent import analyze_image
         ev = analyze_image(image_path, user_text=user_text)
+        error_code_line = f"- 에러코드: {', '.join(ev.error_codes)}\n" if ev.error_codes else ""
         return (
             f"이미지 분석 결과:\n"
             f"- 기기: {ev.device_hint}\n"
             f"- 눈에 보이는 문제: {ev.visible_issue}\n"
-            f"- 에러코드: {', '.join(ev.error_codes) or '없음'}\n"
+            f"{error_code_line}"
             f"- 확인된 부품: {', '.join(ev.visible_components) or '없음'}\n"
             f"- 요약: {ev.summary}\n"
             f"- 신뢰도: {ev.confidence}"
@@ -246,11 +251,22 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
     if pinecone_api_key and OpenAI is not None:
         try:
             from pinecone import Pinecone as _PC
+            if not query or not query.strip():
+                return "관련 정보를 찾지 못했습니다.", []
             oai   = OpenAI()
-            emb   = oai.embeddings.create(model="text-embedding-3-small", input=[query]).data[0].embedding
+            emb   = oai.embeddings.create(model="text-embedding-3-small", input=[query.strip()]).data[0].embedding
             pc    = _PC(api_key=pinecone_api_key)
             index = pc.Index(pinecone_index)
-            matches = index.query(vector=emb, top_k=3, include_metadata=True).get("matches", [])
+
+            # 1차: 디바이스 필터 적용 검색
+            _filter = {"device": {"$eq": device_hint}} if device_hint and device_hint != "unknown" else None
+            matches = index.query(
+                vector=emb, top_k=3, include_metadata=True,
+                **({'filter': _filter} if _filter else {}),
+            ).get("matches", [])
+            # 결과 없으면 필터 없이 재검색
+            if not matches and _filter:
+                matches = index.query(vector=emb, top_k=3, include_metadata=True).get("matches", [])
 
             if matches:
                 texts: List[str] = []
@@ -260,8 +276,12 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
                     content = str(meta.get("content_chunk", ""))
                     if content:
                         texts.append(content[:800])
-                    # 이미지: 모든 매치에서 수집 (최대 8개까지)
+                    # 이미지: 디바이스 타입이 다른 청크의 이미지는 건너뜀
                     if len(image_paths) < 8:
+                        meta_device = meta.get("device", "")
+                        if (device_hint and device_hint != "unknown"
+                                and meta_device and meta_device != device_hint):
+                            continue  # 제품 타입 불일치 → 이미지 스킵
                         raw = meta.get("image_urls", "")
                         filenames: List[str] = json.loads(raw) if raw else []
                         need = 8 - len(image_paths)
@@ -313,9 +333,93 @@ def _execute_search(query: str, device_hint: str = "unknown") -> tuple[str, List
         return f"검색 오류: {e}", []
 
 
+# ── Vision 이미지 디바이스 검증 ───────────────────────────────────────────────
+
+_DEVICE_KO = {
+    "refrigerator": "냉장고",
+    "washing_machine": "세탁기",
+    "air_conditioner": "에어컨",
+}
+
+
+def _token_limit_kwargs(model: str, limit: int) -> Dict[str, int]:
+    normalized = (model or "").strip().lower()
+    if normalized.startswith("gpt-5"):
+        return {"max_completion_tokens": limit}
+    return {"max_tokens": limit}
+
+
+async def _validate_images_by_device(
+    image_urls: List[str],
+    device_hint: str,
+    client: "AsyncOpenAI",
+    query: str = "",
+) -> List[str]:
+    """GPT-4o-mini vision으로 진단 증상과 관련 없는 이미지를 제거한다.
+
+    - query가 있으면 증상+기기 관련성으로 판단 (더 정확)
+    - query가 없으면 기기 타입 포함 여부로 판단
+    - API 호출 실패 또는 모든 이미지가 걸러질 경우 원본 목록을 그대로 반환.
+    """
+    if not image_urls:
+        return image_urls
+
+    device_ko = _DEVICE_KO.get(device_hint, "가전제품") if device_hint and device_hint != "unknown" else "가전제품"
+    vision_model = os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini")
+
+    if query:
+        prompt = (
+            f"당신은 가전제품 AS 지원 이미지 검수자입니다. 기준이 매우 엄격합니다.\n"
+            f"아래는 '{device_ko}' 관련 진단 내용입니다:\n"
+            f"---\n{query}\n---\n\n"
+            f"진단 내용에 직접적으로 관련된 이미지 번호만 JSON 배열로 답하세요. 확신이 없으면 제외하세요. 없으면 [].\n\n"
+            f"포함 기준 (모두 충족해야 포함):\n"
+            f"- 진단에서 명시적으로 언급한 특정 부품, 소리, 현상을 정확히 보여주는 이미지\n"
+            f"- 진단의 핵심 해결 단계와 1:1로 대응되는 이미지\n\n"
+            f"제외 기준 (하나라도 해당하면 반드시 제외):\n"
+            f"- O/X 표시가 있는 설치 방법·취급 가이드 이미지 (진단이 설치 문제가 아닌 경우)\n"
+            f"- 도어 실·가스켓·레벨링·수평 조절 이미지 (진단에서 해당 내용 없는 경우)\n"
+            f"- 진단에서 언급하지 않은 부품이나 증상을 다루는 이미지\n"
+            f"- 제품 외관만 보여주는 일반 홍보·소개 이미지\n"
+            f"- 진단 내용과 간접적으로만 관련된 이미지"
+        )
+    else:
+        prompt = (
+            f"아래 이미지 중 '{device_ko}'의 고장·이상 증상을 구체적으로 보여주는 이미지 번호를 JSON 배열로만 답하세요. "
+            f"설치 방법이나 일반 사용법 이미지는 제외하세요. 예: [1, 3]. 해당 없으면 []."
+        )
+
+    content: List[Any] = [{"type": "text", "text": prompt}]
+    for i, url in enumerate(image_urls, 1):
+        content.append({"type": "text", "text": f"이미지{i}:"})
+        content.append({"type": "image_url", "image_url": {"url": url, "detail": "low"}})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=vision_model,
+            messages=[{"role": "user", "content": content}],
+            **_token_limit_kwargs(vision_model, 100),
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        m = re.search(r"\[.*?\]", raw, re.DOTALL)
+        if m:
+            indices = json.loads(m.group())
+            filtered = [
+                image_urls[i - 1]
+                for i in indices
+                if isinstance(i, int) and 1 <= i <= len(image_urls)
+            ]
+            # vision이 관련 이미지를 찾으면 그것만, 하나도 없으면 원본 전체 사용
+            return filtered if filtered else image_urls
+    except Exception as _e:
+        logger.warning("이미지 관련성 검증 실패, 원본 반환: %s", _e)
+
+    return image_urls
+
+
 # ── 이미지 ↔ 텍스트 매핑 (GPT-4o vision) ────────────────────────────────────
 
-def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
+async def _match_images_to_text(text: str, image_urls: List[str], client: "AsyncOpenAI") -> str:
     """GPT-4o-mini vision으로 이미지를 텍스트 단계에 맞게 [이미지N] 마커로 삽입.
 
     번호 단계가 없거나 이미지가 없으면 원본 텍스트를 그대로 반환.
@@ -352,10 +456,10 @@ def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
         content.append({"type": "image_url", "image_url": {"url": url, "detail": "low"}})
 
     try:
-        resp = client.chat.completions.create(
+        resp = await client.chat.completions.create(
             model=vision_model,
             messages=[{"role": "user", "content": content}],
-            max_tokens=2000,
+            **_token_limit_kwargs(vision_model, 2000),
         )
         result = (resp.choices[0].message.content or "").strip()
         # 원본 텍스트 길이의 50% 미만이면 손상된 것으로 판단 → 원본 반환
@@ -369,7 +473,7 @@ def _match_images_to_text(text: str, image_urls: List[str], client) -> str:
 
 # ── 메인 에이전트 루프 ────────────────────────────────────────────────────────
 
-def run_agent_loop(
+async def run_agent_loop(
     user_text: str,
     user_name: str = "",
     device_hint: str = "unknown",
@@ -385,17 +489,17 @@ def run_agent_loop(
 
     Returns AgentLoopResult with final_response and metadata.
     """
-    if OpenAI is None:
+    if AsyncOpenAI is None:
         return AgentLoopResult(final_response="OpenAI 패키지가 설치되지 않았습니다.")
 
-    client = OpenAI()
+    client = AsyncOpenAI()
     display_name = user_name.strip() or "고객"
     model = os.getenv("OPENAI_AGENT_MODEL", "gpt-4.1-mini")
 
     _has_image = bool(image_path)
     _has_audio = bool(audio_path)
 
-    system_prompt = f"""당신은 LG전자 가전제품 AS 전문 AI 에이전트입니다. 이름: 레보(Rebo). 고객 이름: {display_name}.
+    system_prompt = f"""당신은 LG전자 가전제품 AS 전문 AI 에이전트입니다. 이름: 리보(Rebo). 고객 이름: {display_name}.
 
 ## 필수 3단계 판단 프로세스
 
@@ -407,7 +511,12 @@ def run_agent_loop(
 - 그 다음 search_knowledge_base로 증상/에러코드를 검색하세요.
 - 제품군(냉장고/세탁기/에어컨)과 증상 유형을 파악하세요.
   (유형: 작동불가/성능저하/이상소음/이상진동/누수누출/오류코드/외관손상/냄새위생/동결)
-- 정보가 부족하면 ask_user_question으로 한 가지만 질문하세요.
+- 정보가 부족하면 ask_user_question으로 아래 우선순위에 따라 가장 중요한 한 가지만 질문하세요:
+  1순위) 언제부터 발생했나요? (갑자기/서서히, 며칠 전/몇 주 전)
+  2순위) 항상 발생하나요, 아니면 특정 상황에서만 발생하나요?
+  3순위) 특정 기능 사용 중/후에만 발생하나요? (예: 세탁 중, 냉동실 열 때)
+
+**[소음 증상 필수 규칙]** 사용자가 "이상한 소리", "소음", "소리가 난다" 등 소음을 언급했으나 소리의 종류(드르륵/윙윙/딸깍/쉬~/뚝뚝 등)를 명시하지 않은 경우, search_knowledge_base 호출 전에 반드시 ask_user_question으로 소리 유형을 먼저 확인하세요. 소리 유형 없이는 정확한 진단이 불가능합니다.
 
 ### 2단계: 원인 분석
 - 검색 결과를 바탕으로 가장 가능성 높은 원인 1-2가지를 추론하세요.
@@ -423,45 +532,67 @@ def run_agent_loop(
 
 행동 패턴:
 - A패턴 (레벨 1): 단계별 자가 해결 가이드 제공 (최대 5단계)
-- B패턴 (레벨 2): 자가점검 가이드 제공 후 결과 재확인 안내
+- B패턴 (레벨 2): 자가점검 가이드 제공 후 반드시 마지막 문장에 "이 방법을 시도해보신 후 결과를 알려주세요. 해결되지 않으면 전문가 수리가 필요할 수 있어요." 로 마무리하세요.
 - C패턴 (레벨 3): 간략한 원인 설명 후 initiate_as_booking 반드시 호출
 - D패턴 (레벨 4): 즉시 사용 중단 + 안전 조치 안내 후 connect_human_agent 반드시 호출
+
+## 서비스 요청 즉시 처리 규칙 (최우선)
+다음 상황에서는 진단 3단계를 건너뛰고 **즉시** 해당 도구를 호출하세요. 날짜/시간/주소를 절대 물어보지 마세요:
+- 사용자가 AS 신청, 수리 신청, 서비스 접수를 요청하면 → **즉시 initiate_as_booking 호출**
+- 사용자가 출장 서비스, 방문 예약, 기사 방문을 요청하면 → **즉시 initiate_as_booking 호출**
+- 사용자가 상담사 연결, 고객센터, 사람과 통화를 요청하면 → **즉시 connect_human_agent 호출**
 
 ## 응답 규칙
 1. 최종 답변은 쉬운 한국어로, 번호 단계를 포함해 작성하세요.
 2. URL, 링크, 마크다운(볼드 제외)은 사용하지 마세요.
 3. 답변 첫 문장은 반드시 '**{display_name}님의 문제를 진단해봤어요!**'로 시작하세요.
 4. 레벨 1-2 답변: 첫 줄에 심각도 표시를 포함하세요. (예: 🟢 자가 해결 가능 / 🟡 확인 필요)
-5. 레벨 3: initiate_as_booking을 반드시 호출하세요.
+5. 레벨 3: initiate_as_booking을 반드시 호출하세요. 날짜/시간을 물어보지 마세요.
 6. 레벨 4: connect_human_agent를 반드시 호출하세요. 답변에 ⚠️ 안전 경고를 포함하세요.
-7. 모든 최종 답변(finish_reason=stop) 끝에 반드시 아래 메타 블록을 추가하세요 (사용자에게 표시되지 않음):
+7. 레벨 1-2 답변 마지막에 진단 신뢰도를 한 줄로 표시하세요:
+   - 충분한 정보(이미지/오디오/에러코드/모델명)가 있을 때 → 🔵 진단 신뢰도: 높음
+   - 증상 설명만 있고 추가 정보가 없을 때 → 🟡 진단 신뢰도: 보통 (모델명/사진 제공 시 더 정확해요)
+   - 정보가 매우 부족하거나 증상이 모호할 때 → ⚪ 진단 신뢰도: 낮음 (추가 정보가 필요해요)
+8. 모든 최종 답변(finish_reason=stop) 끝에 반드시 아래 메타 블록을 추가하세요 (사용자에게 표시되지 않음):
 
 [[AGENT_META]]
-{{"severity_level": <1|2|3|4>, "action_pattern": "<A|B|C|D>", "step1": "<증상 분류 요약>", "step2": "<원인 분석 요약>", "step3": "<심각도 판단 근거>"}}
+{{"severity_level": <1|2|3|4>, "action_pattern": "<A|B|C|D>", "confidence": "<high|medium|low>", "step1": "<증상 분류 요약>", "step2": "<원인 분석 요약>", "step3": "<심각도 판단 근거>"}}
 [[/AGENT_META]]
+"""
+
+    system_prompt += """
+
+## 대화 연속성 규칙
+- 최근 대화에 이미 진단 내용이나 증상 설명이 있고, 최신 메시지가 더 자세한 설명, 쉬운 설명, 반복 설명, 이전 답변의 의미를 묻는 경우 → 같은 문제의 연속으로 처리하세요.
+- 그 경우 새로운 접수 흐름을 시작하지 말고 이전 답변을 이어서 진행하세요.
+- 최근 대화나 고객 프로필에 이미 있는 제품, 증상, 모델 정보는 재활용하세요.
+- 모델명이나 제품 정보가 진짜 없고 반드시 필요할 때만 다시 물어보세요.
+
+## B패턴 후속 처리 규칙
+- 이전 응답이 B패턴(레벨 2)이었고 고객이 자가점검 결과를 알려온 경우:
+  - "해결됐어요" / "됐어요" / "괜찮아졌어요" 등 → 🟢 해결 축하 메시지 + 추가 이상 시 재문의 안내
+  - "안 됐어요" / "그대로예요" / "여전해요" 등 → 레벨 3으로 상향, initiate_as_booking 호출
 """
 
     # 유저 프로필 정보가 있으면 system prompt에 추가
     if user_profile_context:
         system_prompt += f"\n\n## 고객 정보 (DB 등록 정보)\n{user_profile_context}\n"
-        system_prompt += "AS 예약 시 위 주소/연락처를 활용하세요. 등록 제품 모델명을 검색 쿼리에 포함하세요.\n"
+        system_prompt += (
+            "search_knowledge_base 호출 시 등록된 제품의 모델번호(model_no)를 쿼리에 반드시 포함하세요. "
+            "예: '냉장고 드드득 소리 F873SS55E'. 모델번호가 있으면 일반 검색보다 훨씬 정확한 결과를 얻을 수 있습니다.\n"
+            "AS 예약 시 위 주소/연락처를 활용하세요.\n"
+        )
 
-    # 오디오 첨부 시 자동 분석 후 결과를 컨텍스트에 주입
-    if _has_audio:
-        auto_audio = _execute_analyze_audio(audio_path)
-        audio_summary = auto_audio
-
-    # 이미지 첨부 시 자동 분석 후 결과를 컨텍스트에 주입
-    if _has_image:
-        auto_image = _execute_analyze_image(image_path, user_text)
-        image_summary = auto_image
-
-    # 사용자 메시지 구성
+    # 사용자 메시지 구성 — 이미지/오디오는 AI가 루프 안에서 직접 도구 호출
     user_content = user_text
-    if image_summary:
-        user_content += f"\n[이미지 분석 결과: {image_summary}]"
-    if audio_summary:
-        user_content += f"\n[소음 분석 결과: {audio_summary}]"
+    if _has_image:
+        user_content += "\n[이미지가 첨부되었습니다. analyze_image 도구로 분석하세요.]"
+    elif image_summary:
+        user_content += f"\n[이미지 분석: {image_summary}]"
+    if _has_audio:
+        user_content += "\n[소음 녹음이 첨부되었습니다. analyze_audio 도구로 분석하세요.]"
+    elif audio_summary:
+        user_content += f"\n[음성 분석: {audio_summary}]"
 
     messages: List[Dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
@@ -471,14 +602,26 @@ def run_agent_loop(
     steps: List[AgentStep] = []
     collected_images: List[str] = []
 
+    # 루프 시작 전 선검색 — 텍스트 컨텍스트 보강용으로만 사용
+    # 이미지는 수집하지 않음: AI가 구체적 쿼리로 search_knowledge_base를 호출한 뒤
+    # _validate_images_by_device → _match_images_to_text 순서로 처리해야
+    # 진단 내용과 관련 없는 이미지가 섞이는 문제를 방지할 수 있음
+    if user_text.strip():
+        try:
+            pre_text, _ = await asyncio.to_thread(_execute_search, user_text[:200], device_hint)
+            if pre_text and pre_text != "관련 정보를 찾지 못했습니다.":
+                messages[1]["content"] += f"\n[사전 참고 정보: {pre_text[:500]}]"
+        except Exception:
+            pass
+
     for iteration in range(1, max_iterations + 1):
         try:
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model,
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
                 tool_choice="auto",
-                max_tokens=1500,
+                **_token_limit_kwargs(model, 900),
             )
         except Exception as e:
             return AgentLoopResult(
@@ -493,16 +636,33 @@ def run_agent_loop(
         if finish_reason == "stop":
             raw_text = choice.message.content or ""
             final_text, meta = _parse_agent_meta(raw_text)
-            # 이미지가 있으면 vision으로 텍스트 단계에 인라인 배치
-            if collected_images:
-                final_text = _match_images_to_text(final_text, collected_images, client)
             steps.append(AgentStep(iteration=iteration, action="final_response"))
+
+            # 1) Vision으로 증상과 관련 없는 이미지 제거
+            final_images = collected_images
+            if collected_images:
+                try:
+                    final_images = await _validate_images_by_device(
+                        collected_images, device_hint, client,
+                        query=final_text[:400],
+                    )
+                except Exception as _ve:
+                    logger.warning("이미지 검증 실패, 원본 이미지 사용: %s", _ve)
+
+            # 2) 이미지가 있으면 vision으로 텍스트 단계에 인라인 배치
+            if final_images:
+                try:
+                    final_text = await _match_images_to_text(final_text, final_images, client)
+                except Exception as _me:
+                    logger.warning("이미지 매핑 실패, 원본 텍스트 사용: %s", _me)
+
             return AgentLoopResult(
                 final_response=final_text,
                 steps=steps,
-                image_paths=collected_images,
+                image_paths=final_images,
                 severity_level=meta.get("severity_level"),
                 action_pattern=meta.get("action_pattern"),
+                confidence=meta.get("confidence"),
                 judgment_steps={
                     "step1": str(meta.get("step1", "")),
                     "step2": str(meta.get("step2", "")),
@@ -562,17 +722,23 @@ def run_agent_loop(
 
                 # ── analyze_image 실행 ───────────────────────────────────────
                 if name == "analyze_image":
-                    tool_result = _execute_analyze_image(image_path, user_text)
+                    tool_result = await asyncio.to_thread(
+                        _execute_analyze_image, image_path, user_text
+                    )
 
                 # ── analyze_audio 실행 ───────────────────────────────────────
                 elif name == "analyze_audio":
-                    tool_result = _execute_analyze_audio(audio_path)
+                    tool_result = await asyncio.to_thread(
+                        _execute_analyze_audio, audio_path
+                    )
 
                 # ── search_knowledge_base 실행 ────────────────────────────────
                 elif name == "search_knowledge_base":
                     query = args.get("query", user_text)
                     hint = args.get("device_hint", device_hint)
-                    result_text, images = _execute_search(query, hint)
+                    result_text, images = await asyncio.to_thread(
+                        _execute_search, query, hint
+                    )
                     if images:
                         for img in images:
                             if img not in collected_images:
@@ -593,12 +759,12 @@ def run_agent_loop(
 
     # 최대 루프 초과 시 강제 답변 생성
     try:
-        fallback = client.chat.completions.create(
+        fallback = await client.chat.completions.create(
             model=model,
             messages=messages + [
                 {"role": "user", "content": "지금까지 수집한 정보를 바탕으로 최종 답변을 한국어로 작성해주세요."}
             ],
-            max_tokens=800,
+            **_token_limit_kwargs(model, 800),
         )
         final_text = fallback.choices[0].message.content or "죄송합니다. 답변 생성에 실패했습니다."
     except Exception as _e:

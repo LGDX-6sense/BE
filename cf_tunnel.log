@@ -1,0 +1,26 @@
+{"level":"info","time":"2026-03-26T10:06:27Z","message":"Thank you for trying Cloudflare Tunnel. Doing so, without a Cloudflare account, is a quick way to experiment and try it out. However, be aware that these account-less Tunnels have no uptime guarantee, are subject to the Cloudflare Online Services Terms of Use (https://www.cloudflare.com/website-terms/), and Cloudflare reserves the right to investigate your use of Tunnels for violations of such terms. If you intend to use Tunnels in production you should use a pre-created named tunnel by following: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps"}
+{"level":"info","time":"2026-03-26T10:06:27Z","message":"Requesting new quick Tunnel on trycloudflare.com..."}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"+--------------------------------------------------------------------------------------------+"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"|  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"|  https://idle-hat-annex-sides.trycloudflare.com                                            |"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"+--------------------------------------------------------------------------------------------+"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp]"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"Version 2025.8.1 (Checksum b5d598b00cc3a28cabc5812d9f762819334614bae452db4e7f23eefe7b081556)"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"GOOS: windows, GOVersion: go1.24.2, GoArch: amd64"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"Settings: map[ha-connections:1 logfile:c:\\Users\\4151\\BE\\cf_tunnel.log no-autoupdate:true protocol:quic url:http://127.0.0.1:8000]"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"cloudflared will not automatically update on Windows systems."}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"Generated Connector ID: 9741e575-a375-45a4-a3c6-6228449542f9"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"Initial protocol quic"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"ICMP proxy will use 192.168.0.13 as source for IPv4"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"ICMP proxy will use fe80::beb0:8a16:7011:b5ef in zone Wi-Fi as source for IPv6"}
+{"level":"error","originCertPath":"","time":"2026-03-26T10:06:30Z","message":"Cannot determine default origin certificate path. No file cert.pem in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp]. You need to specify the origin certificate path by specifying the origincert option in the configuration file, or set TUNNEL_ORIGIN_CERT environment variable"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"ICMP proxy will use 192.168.0.13 as source for IPv4"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"ICMP proxy will use fe80::beb0:8a16:7011:b5ef in zone Wi-Fi as source for IPv6"}
+{"level":"info","time":"2026-03-26T10:06:30Z","message":"Starting metrics server on 127.0.0.1:20242/metrics"}
+{"level":"info","event":0,"ip":"198.41.192.47","connIndex":0,"time":"2026-03-26T10:06:30Z","message":"Tunnel connection curve preferences: [X25519MLKEM768 CurveP256]"}
+{"level":"info","event":0,"connection":"4a7f507a-7892-400c-a1e0-35462a5b64b3","connIndex":0,"location":"icn06","ip":"198.41.192.47","protocol":"quic","time":"2026-03-26T10:06:30Z","message":"Registered tunnel connection"}
+{"level":"error","event":1,"connIndex":0,"originService":"http://127.0.0.1:8000","ingressRule":0,"error":"Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8000: connectex: No connection could be made because the target machine actively refused it.","time":"2026-03-26T11:02:07Z"}
+{"level":"error","event":0,"ip":"198.41.192.47","connIndex":0,"error":"Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp 127.0.0.1:8000: connectex: No connection could be made because the target machine actively refused it.","type":"http","dest":"https://idle-hat-annex-sides.trycloudflare.com/health","time":"2026-03-26T11:02:07Z","message":"Request failed"}
+{"level":"error","event":1,"connIndex":0,"originService":"http://127.0.0.1:8000","ingressRule":0,"error":"Incoming request ended abruptly: context canceled","time":"2026-03-26T11:13:12Z"}
+{"level":"error","event":0,"ip":"198.41.192.47","connIndex":0,"error":"Incoming request ended abruptly: context canceled","type":"http","dest":"https://idle-hat-annex-sides.trycloudflare.com/api/tts","time":"2026-03-26T11:13:12Z","message":"Request failed"}

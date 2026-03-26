@@ -41,6 +41,10 @@ class ServiceBookingFlowScreen extends StatefulWidget {
     required this.initialUserName,
     required this.initialPhoneNumber,
     required this.initialAddress,
+    this.initialProduct,
+    this.initialProductType,
+    this.initialSymptomCategory,
+    this.initialDetailedSymptom,
   });
 
   final ServiceBookingType serviceType;
@@ -49,6 +53,10 @@ class ServiceBookingFlowScreen extends StatefulWidget {
   final String initialUserName;
   final String initialPhoneNumber;
   final String initialAddress;
+  final String? initialProduct;
+  final String? initialProductType;
+  final String? initialSymptomCategory;
+  final String? initialDetailedSymptom;
 
   @override
   State<ServiceBookingFlowScreen> createState() =>
@@ -185,6 +193,54 @@ class _ServiceBookingFlowScreenState extends State<ServiceBookingFlowScreen> {
     _nameController.text = widget.initialUserName.trim();
     _phoneController.text = widget.initialPhoneNumber.trim();
     _addressController.text = widget.initialAddress.trim();
+
+    // 채팅 진단 결과 자동 입력
+    if (widget.initialProduct != null && widget.initialProduct!.isNotEmpty) {
+      final matched = _productOptions.firstWhere(
+        (p) => p == widget.initialProduct,
+        orElse: () => '',
+      );
+      if (matched.isNotEmpty) {
+        _selectedProduct = matched;
+        final types = _productTypeOptions[matched] ?? [];
+        // initialProductType으로 유형 매칭, 없으면 첫 번째 선택
+        if (widget.initialProductType != null &&
+            widget.initialProductType!.isNotEmpty) {
+          final typeQuery = widget.initialProductType!;
+          final matchedType = types.firstWhere(
+            (t) => t == typeQuery,
+            orElse: () => types.firstWhere(
+              (t) => t.contains(typeQuery) || typeQuery.contains(t),
+              orElse: () => '',
+            ),
+          );
+          _selectedProductType =
+              matchedType.isNotEmpty ? matchedType : (types.isNotEmpty ? types.first : null);
+        } else if (types.isNotEmpty) {
+          _selectedProductType = types.first;
+        }
+      }
+    }
+    if (widget.initialSymptomCategory != null &&
+        widget.initialSymptomCategory!.isNotEmpty &&
+        _selectedProduct != null) {
+      final symptoms = _symptomOptions[_selectedProduct!] ?? [];
+      final query = widget.initialSymptomCategory!;
+      // 완전 일치 우선, 없으면 포함 관계로 매칭
+      final matched = symptoms.firstWhere(
+        (s) => s == query,
+        orElse: () => symptoms.firstWhere(
+          (s) => s.contains(query) || query.contains(s.split('/').first),
+          orElse: () => '',
+        ),
+      );
+      if (matched.isNotEmpty) _selectedSymptom = matched;
+    }
+    if (widget.initialDetailedSymptom != null &&
+        widget.initialDetailedSymptom!.isNotEmpty) {
+      _detailedSymptomController.text = widget.initialDetailedSymptom!;
+    }
+
     unawaited(_prefillUserProfile());
   }
 
@@ -434,7 +490,14 @@ class _ServiceBookingFlowScreenState extends State<ServiceBookingFlowScreen> {
                 options: symptoms,
                 onSelected: (value) => setState(() {
                   _selectedSymptom = value;
-                  _detailedSymptomController.clear();
+                  final productKr = {
+                    '세탁기': '세탁기',
+                    '냉장고/김치냉장고': '냉장고',
+                    '에어컨/환기': '에어컨',
+                  }[_selectedProduct ?? ''] ?? (_selectedProduct ?? '제품');
+                  final categoryDesc = value.split('/').first;
+                  _detailedSymptomController.text =
+                      '$productKr에서 $categoryDesc 문제가 발생해요';
                 }),
               ),
       ),

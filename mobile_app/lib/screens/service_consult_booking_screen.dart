@@ -10,6 +10,10 @@ class ServiceConsultBookingScreen extends StatelessWidget {
     required this.initialUserName,
     required this.initialPhoneNumber,
     required this.initialAddress,
+    this.initialProduct,
+    this.initialProductType,
+    this.initialSymptomCategory,
+    this.initialDetailedSymptom,
   });
 
   final String baseUrl;
@@ -17,6 +21,10 @@ class ServiceConsultBookingScreen extends StatelessWidget {
   final String initialUserName;
   final String initialPhoneNumber;
   final String initialAddress;
+  final String? initialProduct;
+  final String? initialProductType;
+  final String? initialSymptomCategory;
+  final String? initialDetailedSymptom;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +35,10 @@ class ServiceConsultBookingScreen extends StatelessWidget {
       initialUserName: initialUserName,
       initialPhoneNumber: initialPhoneNumber,
       initialAddress: initialAddress,
+      initialProduct: initialProduct,
+      initialProductType: initialProductType,
+      initialSymptomCategory: initialSymptomCategory,
+      initialDetailedSymptom: initialDetailedSymptom,
     );
   }
 }
