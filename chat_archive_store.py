@@ -715,26 +715,29 @@ def _build_archive_summary_prompt(
         "목표는 자연스럽고 간결하지만 정확한 한 줄 요약입니다.\n"
         "문체는 아래 예시처럼 설명형 문장으로 써 주세요.\n"
         "예시 문체:\n"
-        "- 냉장고 소음으로 문의주셨어요. 원인은 팬 간섭으로 보고 자가 점검을 안내드렸어요.\n"
-        "- AS 관련 문의를 주셨어요. AS 접수를 안내드렸어요.\n"
-        "- 세탁기 진동으로 문의주셨어요. 자가 점검을 안내드렸고 이후 해결됐어요.\n"
-        "- 방문 예약 관련 문의를 주셨어요. 방문 예약을 안내드렸어요.\n"
-        "- 기사 방문이 필요하다고 보고 방문 예약해드렸어요.\n"
+        "- 냉장고 소음으로 문의주셨어요. 원인은 팬 간섭인거같아요. 해결방법을 안내드렸어요.\n"
+        "- AS 관련 문의를 주셨어요. AS 신청을 완료했어요.\n"
+        "- 세탁기 진동으로 문의주셨어요. 원인은 세탁물 쏠림인거같아요. 해결방법을 안내드렸고 이후 해결됐어요.\n"
+        "- 방문 예약 관련 문의를 주셨어요. 방문 예약을 완료했어요.\n"
+        "- 냉장고 냉각 문제로 문의주셨어요. 원인은 냉매 부족인거같아요. AS 신청을 완료했어요.\n"
         "가능하면 첫 문장은 `...으로 문의주셨어요.` 또는 `... 관련 문의를 주셨어요.` 형태로 시작하세요.\n"
-        "원인이 있으면 `원인은 ...이라고 보고` 형태를 우선 사용하세요.\n"
-        "문장 끝은 가능하면 `안내드렸어요`, `도와드렸어요`, `예약해드렸어요`처럼 부드럽게 마무리하세요.\n"
-        "조치에는 실제 대화에 나온 자가조치, AS 접수, 방문 예약, 상담사 연결, 해결 여부만 적으세요.\n"
-        "증거가 불충분하면 단정하지 말고 `가능성이 높다고`, `추정된다고`, `확인 필요하다고` 같은 표현을 유지하세요.\n"
+        "원인이 있으면 반드시 `원인은 ...인거같아요.` 형태로 두 번째 문장에 쓰세요.\n"
+        "마지막 문장은 조치 결과에 따라:\n"
+        "  - 일반 해결 안내: `해결방법을 안내드렸어요.`\n"
+        "  - AS 신청 완료: `AS 신청을 완료했어요.`\n"
+        "  - 방문 예약 완료: `방문 예약을 완료했어요.`\n"
+        "  - 상담사 연결: `상담사 연결을 안내드렸어요.`\n"
+        "  - 해결된 경우: `해결방법을 안내드렸고 이후 해결됐어요.`\n"
         "라벨형 표현(`원인:`, `조치:`), 마크다운, 따옴표, 불필요한 부연은 쓰지 마세요.\n"
         f"추정 원인: {preferred_cause or '미상'}\n"
         f"핵심 조치: {preferred_action or '미상'}\n"
-        "반드시 JSON만 출력하세요. 형식: {\"summary\":\"한 줄 요약\"}\n\n"
+        "반드시 JSON만 출력하세요. 형식: {\"summary\":\"요약\"}\n\n"
         "예시 1:\n"
-        "{\"summary\":\"냉장고 누수로 문의주셨어요. 원인은 배수구 막힘이라고 보고 배수 필터 청소 후 AS 접수를 안내드렸어요.\"}\n"
+        "{\"summary\":\"냉장고 누수로 문의주셨어요. 원인은 배수구 막힘인거같아요. 해결방법을 안내드렸어요.\"}\n"
         "예시 2:\n"
-        "{\"summary\":\"상담사 연결 관련 문의를 주셨어요. 상담사 연결을 안내드렸어요.\"}\n"
+        "{\"summary\":\"AS 관련 문의를 주셨어요. AS 신청을 완료했어요.\"}\n"
         "예시 3:\n"
-        "{\"summary\":\"기사 방문이 필요하다고 보고 방문 예약해드렸어요.\"}\n\n"
+        "{\"summary\":\"방문 예약 관련 문의를 주셨어요. 방문 예약을 완료했어요.\"}\n\n"
         "구조화 단서:\n"
         f"{chr(10).join(signal_lines)}\n\n"
         "최근 대화:\n"
@@ -873,7 +876,8 @@ def _build_archive_lead_sentence(
     return ""
 
 
-def _build_archive_reason_intro(diagnosis_text: str) -> str:
+def _build_archive_reason_sentence(diagnosis_text: str) -> str:
+    """원인 문장을 자연스러운 완성형으로 반환: '원인은 ~인거같아요.'"""
     cleaned = _trim_phrase(_strip_internal_summary_heading(diagnosis_text))
     if not cleaned:
         return ""
@@ -891,44 +895,30 @@ def _build_archive_reason_intro(diagnosis_text: str) -> str:
             cleaned = _trim_phrase(match.group(1))
             break
 
-    if cleaned.endswith("필요"):
-        return f"원인은 {cleaned}하다고 보고"
-    return f"원인은 {_to_reported_clause(cleaned)} 보고"
+    cleaned = _trim_phrase(cleaned)
+    if not cleaned:
+        return ""
+    return f"원인은 {cleaned}인거같아요."
 
 
 def _build_archive_result_sentence(signals: _ArchiveSignals) -> str:
     action_text = _trim_phrase(signals.action)
-    reason_intro = _build_archive_reason_intro(signals.diagnosis)
 
     if signals.resolved:
-        if action_text and not ("AS 접수" in signals.service_status and "AS" in action_text):
-            return f"{action_text}을 안내드렸고 이후 해결됐어요."
+        if action_text and "AS" not in action_text:
+            return f"해결방법을 안내드렸고 이후 해결됐어요."
         return "안내드린 뒤 증상이 해결됐어요."
 
     if signals.service_status == "AS 접수 안내":
-        if reason_intro:
-            return f"{reason_intro} AS 접수를 안내드렸어요."
-        return "AS 접수를 안내드렸어요."
-    if signals.service_status == "방문 예약 안내":
-        if reason_intro:
-            return f"{reason_intro} 방문 예약해드렸어요."
-        if action_text and action_text != "AS 신청":
-            return f"{action_text}이 필요하다고 보고 방문 예약해드렸어요."
-        return "방문 예약을 안내드렸어요."
-    if signals.service_status == "방문 예약 완료":
-        if reason_intro:
-            return f"{reason_intro} 방문 예약해드렸어요."
-        return "방문 예약해드렸어요."
+        return "AS 신청을 완료했어요."
+    if signals.service_status in ("방문 예약 안내", "방문 예약 완료"):
+        return "방문 예약을 완료했어요."
     if signals.service_status == "상담사 연결 안내":
         return "상담사 연결을 안내드렸어요."
 
-    if reason_intro and action_text:
-        return f"{reason_intro} {action_text}을 안내드렸어요."
-    if reason_intro:
-        return f"{reason_intro} 확인해보시도록 안내드렸어요."
     if action_text:
-        return f"{action_text}을 안내드렸어요."
-    return ""
+        return f"해결방법을 안내드렸어요."
+    return "해결방법을 안내드렸어요."
 
 
 def _build_archive_narrative_summary(
@@ -938,11 +928,12 @@ def _build_archive_narrative_summary(
     latest_assistant: str,
 ) -> str:
     lead_sentence = _build_archive_lead_sentence(signals, issue_subject, latest_user)
+    reason_sentence = _build_archive_reason_sentence(signals.diagnosis)
     result_sentence = _build_archive_result_sentence(signals)
 
-    compact_summary = " ".join(part for part in (lead_sentence, result_sentence) if part)
+    compact_summary = " ".join(part for part in (lead_sentence, reason_sentence, result_sentence) if part)
     if compact_summary:
-        return _truncate(compact_summary, 140)
+        return _truncate(compact_summary, 180)
 
     symptom = _extract_first_sentence(latest_assistant)
     if symptom:
